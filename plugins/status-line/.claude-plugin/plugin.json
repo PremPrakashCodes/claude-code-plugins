@@ -1,0 +1,11 @@
+{
+  "name": "status-line",
+  "description": "Configurable status-line HUD for Claude Code: model, project, git, context bar, and usage windows. Pure-Python (stdlib only), selectable bar styles, themes, and custom labels.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Prem Prakash Sharma",
+    "url": "https://github.com/PremPrakashCodes"
+  },
+  "commands": ["./commands/setup.md", "./commands/configure.md"],
+  "license": "MIT"
+}

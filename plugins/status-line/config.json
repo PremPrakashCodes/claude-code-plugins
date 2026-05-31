@@ -1,0 +1,58 @@
+{
+  "layout": "compact",
+  "separator": " | ",
+  "theme": "default",
+  "pathLevels": 1,
+
+  "segments": ["model", "project", "git", "context", "usage"],
+
+  "model": {
+    "format": "short",
+    "brackets": true
+  },
+
+  "context": {
+    "label": "ctx",
+    "value": "tokens",
+    "bar": true,
+    "barStyle": "rounded",
+    "barWidth": 10,
+    "warnThreshold": 70,
+    "critThreshold": 85
+  },
+
+  "usage": {
+    "windows": ["5h", "7d"],
+    "labels": { "5h": "5h", "7d": "7d" },
+    "value": "percent",
+    "bar": false,
+    "barStyle": "rounded",
+    "barWidth": 8,
+    "showReset": true,
+    "resetFormat": "relative",
+    "warnThreshold": 75,
+    "critThreshold": 90
+  },
+
+  "git": {
+    "show": true,
+    "showDirty": true,
+    "showAheadBehind": true,
+    "showFileStats": false,
+    "wrap": ["git:(", ")"]
+  },
+
+  "cost": {
+    "label": "$"
+  },
+
+  "session": {
+    "showDuration": false,
+    "showLines": false
+  },
+
+  "colors": {},
+
+  "customBarFilled": null,
+  "customBarEmpty": null
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Prem Prakash's Plugin Marketplace",
+  "owner": {
+    "name": "Prem Prakash Sharma",
+    "email": "premprakashsharma.dev@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "status-line",
+      "source": "./plugins/status-line"
+    }
+  ]
+}
