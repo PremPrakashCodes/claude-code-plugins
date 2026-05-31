@@ -8,7 +8,11 @@ line (or expanded to several). Pure Python, standard library only, no dependenci
 [Opus 4.8] claude git:(main*) ctx ▰▰▱▱▱▱▱▱▱▱ 86k/1.0M 17% | 5h: 6% (2h 17m) | 7d: 44% (3d 6h)
 ```
 
-![Status-line HUD preview](assets/status-line-preview.png)
+### Previews
+
+#### Flat Terminal Status Line HUD
+
+![Flat Terminal Screenshot](assets/terminal-view-hud.png)
 
 ## Install
 
