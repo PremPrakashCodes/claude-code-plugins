@@ -25,8 +25,8 @@ The current `status-line` plugin has no runtime dependencies beyond Python's
 standard library. Development tools are optional extras.
 
 ```bash
-git clone git@github.com:PremPrakashCodes/claude.git
-cd claude/plugins/status-line
+git clone git@github.com:PremPrakashCodes/claude-code-plugins.git
+cd claude-code-plugins/plugins/status-line
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"

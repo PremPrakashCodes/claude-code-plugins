@@ -9,7 +9,7 @@ self-contained plugins under `plugins/`.
 In Claude Code:
 
 ```text
-/plugin marketplace add PremPrakashCodes/claude
+/plugin marketplace add PremPrakashCodes/claude-code-plugins
 ```
 
 Then install a plugin from the marketplace:
@@ -71,8 +71,8 @@ Prerequisites:
 Set up the current plugin for development:
 
 ```bash
-git clone git@github.com:PremPrakashCodes/claude.git
-cd claude/plugins/status-line
+git clone git@github.com:PremPrakashCodes/claude-code-plugins.git
+cd claude-code-plugins/plugins/status-line
 python3 -m venv .venv
 source .venv/bin/activate
 # Windows (PowerShell): .venv\Scripts\Activate.ps1
