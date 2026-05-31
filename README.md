@@ -1,4 +1,4 @@
-# Prem Prakash's Claude Code Plugin Marketplace
+# Claude Code Plugin Marketplace
 
 A small, contributor-friendly [Claude Code](https://claude.com/claude-code)
 plugin marketplace. The repository is organized as a marketplace shell with
