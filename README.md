@@ -16,6 +16,7 @@ Then install a plugin from the marketplace:
 
 ```text
 /plugin install status-line
+/reload-plugins
 /status-line:setup
 ```
 
@@ -123,8 +124,8 @@ Release checklist:
    release section.
 3. Run `make check`.
 4. Push to `main` after review.
-5. Verify installation in Claude Code with `/plugin install status-line` and
-   `/status-line:setup`.
+5. Verify installation in Claude Code with `/plugin install status-line`,
+   `/reload-plugins`, and `/status-line:setup`.
 
 ## Documentation
 
