@@ -36,7 +36,7 @@ The HUD renders a compact, single-line view of your session:
 
 #### Flat Terminal Status Line HUD
 
-![Flat Terminal Screenshot](plugins/status-line/assets/terminal-view-hud.png)
+![Flat Terminal Screenshot](plugins/status-line/assets/status-line-preview.png)
 
 Preview it yourself without installing — see
 [Preview the status line](#development-setup).

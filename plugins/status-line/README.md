@@ -12,7 +12,7 @@ line (or expanded to several). Pure Python, standard library only, no dependenci
 
 #### Flat Terminal Status Line HUD
 
-![Flat Terminal Screenshot](assets/terminal-view-hud.png)
+![Flat Terminal Screenshot](assets/status-line-preview.png)
 
 ## Install
 
