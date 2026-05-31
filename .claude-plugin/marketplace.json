@@ -1,5 +1,6 @@
 {
-  "name": "Prem Prakash's Plugin Marketplace",
+  "name": "PremPrakashCodes",
+  "description": "Claude Code plugin marketplace for PremPrakashCodes extensions.",
   "owner": {
     "name": "Prem Prakash Sharma",
     "email": "premprakashsharma.dev@gmail.com"
