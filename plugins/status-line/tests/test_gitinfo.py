@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 
 import _path  # noqa: F401
-
 from hud import gitinfo
 
 HAS_GIT = shutil.which("git") is not None
@@ -29,6 +28,7 @@ class TestGitInfoRealRepo(unittest.TestCase):
         self._git("init", "-b", "main")
         self._git("config", "user.email", "t@t.t")
         self._git("config", "user.name", "t")
+        self._git("config", "commit.gpgsign", "false")
         (Path(self.dir) / "a.txt").write_text("hello")
         self._git("add", "a.txt")
         self._git("commit", "-m", "init")
@@ -37,8 +37,7 @@ class TestGitInfoRealRepo(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def _git(self, *args):
-        subprocess.run(["git", "-C", self.dir, *args],
-                       capture_output=True, check=True)
+        subprocess.run(["git", "-C", self.dir, *args], capture_output=True, check=True)
 
     def test_clean_repo(self):
         status = gitinfo.collect(self.dir)

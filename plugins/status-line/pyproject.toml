@@ -4,6 +4,25 @@ version = "0.1.0"
 description = "Configurable status-line HUD for Claude Code (pure Python, stdlib only)"
 readme = "README.md"
 requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Prem Prakash Sharma" },
+]
+keywords = ["claude-code", "plugin", "status-line", "hud", "terminal"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
 dependencies = []
 
 # Exposes a `status-line` command (and `python -m hud`) once installed.
@@ -13,9 +32,38 @@ dependencies = []
 [project.scripts]
 status-line = "hud.cli:main"
 
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/PremPrakashCodes/claude"
+Issues = "https://github.com/PremPrakashCodes/claude/issues"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hud"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+  # UP007 would rewrite Optional[X]/Union[...] to `X | Y`. Annotations are
+  # stringized via `from __future__ import annotations`, so either form is
+  # safe on the Python 3.8 floor; ignored to keep annotation style a
+  # contributor choice rather than a lint-enforced rewrite.
+  "UP007",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

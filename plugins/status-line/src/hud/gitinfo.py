@@ -34,7 +34,9 @@ def _run(args: list[str], cwd: str) -> str | None:
     try:
         result = subprocess.run(
             ["git", "-C", cwd, *args],
-            capture_output=True, text=True, timeout=_TIMEOUT,
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError):
         return None

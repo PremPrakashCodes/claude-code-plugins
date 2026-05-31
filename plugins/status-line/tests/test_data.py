@@ -1,7 +1,6 @@
 import unittest
 
 import _path  # noqa: F401
-
 from hud import data as data_mod
 
 
@@ -18,8 +17,12 @@ class TestData(unittest.TestCase):
                     "cache_read_input_tokens": 60_000,
                 },
             },
-            "cost": {"total_cost_usd": 0.42, "total_duration_ms": 1000,
-                     "total_lines_added": 5, "total_lines_removed": 2},
+            "cost": {
+                "total_cost_usd": 0.42,
+                "total_duration_ms": 1000,
+                "total_lines_added": 5,
+                "total_lines_removed": 2,
+            },
             "rate_limits": {
                 "five_hour": {"used_percentage": 6, "resets_at": 1000},
                 "seven_day": {"used_percentage": 44, "resets_at": 2000},
@@ -37,18 +40,26 @@ class TestData(unittest.TestCase):
         self.assertEqual(d.windows["7d"].resets_at, 2000)
 
     def test_native_used_percentage_preferred(self):
-        d = data_mod.parse({"context_window": {
-            "context_window_size": 200_000,
-            "used_percentage": 73.5,
-            "current_usage": {"input_tokens": 1000},
-        }})
+        d = data_mod.parse(
+            {
+                "context_window": {
+                    "context_window_size": 200_000,
+                    "used_percentage": 73.5,
+                    "current_usage": {"input_tokens": 1000},
+                }
+            }
+        )
         self.assertAlmostEqual(d.context_percent, 73.5)
 
     def test_computed_percentage_when_no_native(self):
-        d = data_mod.parse({"context_window": {
-            "context_window_size": 200_000,
-            "current_usage": {"input_tokens": 100_000},
-        }})
+        d = data_mod.parse(
+            {
+                "context_window": {
+                    "context_window_size": 200_000,
+                    "current_usage": {"input_tokens": 100_000},
+                }
+            }
+        )
         self.assertAlmostEqual(d.context_percent, 50.0)
 
     def test_cwd_falls_back_to_top_level(self):

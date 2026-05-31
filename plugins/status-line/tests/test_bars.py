@@ -1,7 +1,6 @@
 import unittest
 
 import _path  # noqa: F401
-
 from hud import bars
 from hud.colors import strip_ansi
 
@@ -44,8 +43,9 @@ class TestBars(unittest.TestCase):
         self.assertEqual(bar, "⣿" * 4)
 
     def test_custom_glyph_override(self):
-        bar = strip_ansi(bars.render_bar(100, width=3, style="blocks",
-                                         filled_char="#", empty_char="."))
+        bar = strip_ansi(
+            bars.render_bar(100, width=3, style="blocks", filled_char="#", empty_char=".")
+        )
         self.assertEqual(bar, "###")
 
     def test_bracketed_style_has_brackets(self):

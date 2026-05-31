@@ -2,7 +2,6 @@ import unittest
 from unittest import mock
 
 import _path  # noqa: F401
-
 from hud import config as config_mod
 from hud import data as data_mod
 from hud import render as render_mod
@@ -55,8 +54,7 @@ class TestRender(unittest.TestCase):
         line = visible(screenshot_payload(), build_config())
         self.assertEqual(
             line,
-            "[Opus 4.8] | claude | ctx ▰▱▱▱▱▱▱▱▱▱ 86k/1.0M "
-            "| 5h: 6% (2h 17m) | 7d: 44% (3d 6h)",
+            "[Opus 4.8] | claude | ctx ▰▱▱▱▱▱▱▱▱▱ 86k/1.0M | 5h: 6% (2h 17m) | 7d: 44% (3d 6h)",
         )
 
     def test_model_short_strips_parenthetical(self):
@@ -79,19 +77,26 @@ class TestRender(unittest.TestCase):
 
     def test_context_percent_mode(self):
         cfg = build_config(segments=["context"], context={"value": "percent"})
-        self.assertEqual(visible(screenshot_payload(), cfg), "ctx ▰▱▱▱▱▱▱▱▱▱ 9%")
+        self.assertEqual(
+            visible(screenshot_payload(), cfg),
+            "ctx ▰▱▱▱▱▱▱▱▱▱ 9%",
+        )
 
     def test_context_both_mode(self):
         cfg = build_config(segments=["context"], context={"value": "both"})
-        self.assertEqual(visible(screenshot_payload(), cfg), "ctx ▰▱▱▱▱▱▱▱▱▱ 86k/1.0M 9%")
+        self.assertEqual(
+            visible(screenshot_payload(), cfg),
+            "ctx ▰▱▱▱▱▱▱▱▱▱ 86k/1.0M 9%",
+        )
 
     def test_context_no_bar(self):
         cfg = build_config(segments=["context"], context={"bar": False, "value": "tokens"})
         self.assertEqual(visible(screenshot_payload(), cfg), "ctx 86k/1.0M")
 
     def test_usage_remaining_mode(self):
-        cfg = build_config(segments=["usage"],
-                           usage={"value": "remaining", "windows": ["5h"], "showReset": False})
+        cfg = build_config(
+            segments=["usage"], usage={"value": "remaining", "windows": ["5h"], "showReset": False}
+        )
         self.assertEqual(visible(screenshot_payload(), cfg), "5h: 94%")
 
     def test_segment_order_respected(self):
@@ -105,23 +110,30 @@ class TestRender(unittest.TestCase):
         self.assertNotIn("git:(", line)
 
     def test_expanded_layout_one_segment_per_line(self):
-        cfg = build_config(layout="expanded", segments=["model", "context"],
-                           context={"value": "percent"})
+        cfg = build_config(
+            layout="expanded", segments=["model", "context"], context={"value": "percent"}
+        )
         lines = visible(screenshot_payload(), cfg).split("\n")
         self.assertEqual(lines, ["[Opus 4.8]", "ctx ▰▱▱▱▱▱▱▱▱▱ 9%"])
 
     def test_cost_and_session_segments(self):
         payload = screenshot_payload()
-        payload["cost"] = {"total_cost_usd": 0.42, "total_duration_ms": 8220 * 1000,
-                           "total_lines_added": 10, "total_lines_removed": 3}
-        cfg = build_config(segments=["cost", "session"],
-                           session={"showDuration": True, "showLines": True})
+        payload["cost"] = {
+            "total_cost_usd": 0.42,
+            "total_duration_ms": 8220 * 1000,
+            "total_lines_added": 10,
+            "total_lines_removed": 3,
+        }
+        cfg = build_config(
+            segments=["cost", "session"], session={"showDuration": True, "showLines": True}
+        )
         line = visible(payload, cfg)
         self.assertEqual(line, "$0.42 | 2h 17m | +10 -3")
 
     def test_custom_separator(self):
-        cfg = build_config(segments=["model", "context"], separator=" · ",
-                           context={"value": "percent"})
+        cfg = build_config(
+            segments=["model", "context"], separator=" · ", context={"value": "percent"}
+        )
         self.assertIn(" · ", visible(screenshot_payload(), cfg))
 
     def test_empty_payload_does_not_crash(self):
@@ -131,6 +143,7 @@ class TestRender(unittest.TestCase):
 
     def test_truncate_drops_trailing_cells(self):
         import os
+
         cfg = build_config()
         old = os.environ.get("COLUMNS")
         os.environ["COLUMNS"] = "20"
@@ -146,8 +159,7 @@ class TestRender(unittest.TestCase):
         self.assertLessEqual(len(line), 20 + len(" | "))
 
     def test_unknown_segment_ignored(self):
-        cfg = build_config(segments=["model", "bogus", "context"],
-                           context={"value": "percent"})
+        cfg = build_config(segments=["model", "bogus", "context"], context={"value": "percent"})
         line = visible(screenshot_payload(), cfg)
         self.assertEqual(line, "[Opus 4.8] | ctx ▰▱▱▱▱▱▱▱▱▱ 9%")
 

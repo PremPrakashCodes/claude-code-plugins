@@ -19,11 +19,15 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
-from . import bars, config as config_mod, data as data_mod, render as render_mod
+from . import bars
+from . import config as config_mod
+from . import data as data_mod
+from . import render as render_mod
 
 
-def _demo_payload() -> dict:
+def _demo_payload() -> dict[str, Any]:
     now = time.time()
     return {
         "model": {"id": "claude-opus-4-8", "display_name": "Opus 4.8 (1M context)"},
@@ -36,16 +40,20 @@ def _demo_payload() -> dict:
                 "cache_read_input_tokens": 60_000,
             },
         },
-        "cost": {"total_cost_usd": 0.42, "total_duration_ms": 1_380_000,
-                 "total_lines_added": 214, "total_lines_removed": 37},
+        "cost": {
+            "total_cost_usd": 0.42,
+            "total_duration_ms": 1_380_000,
+            "total_lines_added": 214,
+            "total_lines_removed": 37,
+        },
         "rate_limits": {
-            "five_hour": {"used_percentage": 6, "resets_at": now + 8220},      # ~2h 17m
-            "seven_day": {"used_percentage": 44, "resets_at": now + 280800},   # ~3d 6h
+            "five_hour": {"used_percentage": 6, "resets_at": now + 8220},  # ~2h 17m
+            "seven_day": {"used_percentage": 44, "resets_at": now + 280800},  # ~3d 6h
         },
     }
 
 
-def _render(payload: dict, config_path: Path | None = None) -> str:
+def _render(payload: dict[str, Any], config_path: Path | None = None) -> str:
     config = config_mod.load(config_path)
     theme = config_mod.resolve_theme(config)
     parsed = data_mod.parse(payload)
@@ -78,8 +86,9 @@ def main(argv: list[str] | None = None) -> None:
         print(_render(payload, config_path))
     except Exception:
         # Never let the status line crash the prompt; fail silent.
-        # read_payload() is inside the guard too: json.loads can raise
-        # RecursionError (deeply nested input), which is not a ValueError.
+        # read_payload() already tolerates malformed/deeply-nested input
+        # (incl. RecursionError); this outer guard is a final backstop for
+        # any render-time error.
         print("")
 
 

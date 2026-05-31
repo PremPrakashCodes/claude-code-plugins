@@ -31,7 +31,7 @@ def _model_name(data: HudData, cfg: dict[str, Any]) -> str:
         name = name.split("(")[0].strip()
         prefix = "Claude "
         if name.startswith(prefix):
-            name = name[len(prefix):]
+            name = name[len(prefix) :]
     return name
 
 
@@ -40,10 +40,11 @@ def _project_path(data: HudData, levels: int) -> str:
     segments = [s for s in path.replace("\\", "/").split("/") if s]
     if not segments:
         return "/"
-    return "/".join(segments[-max(1, levels):])
+    return "/".join(segments[-max(1, levels) :])
 
 
 # --- individual segment renderers -----------------------------------------
+
 
 def _seg_model(data, config, theme) -> str | None:
     cfg = config["model"]
@@ -115,15 +116,17 @@ def _seg_context(data, config, theme) -> str | None:
         parts.append(colorize(label, theme["label"]))
 
     if cfg.get("bar", True):
-        parts.append(bars.render_bar(
-            percent,
-            width=cfg.get("barWidth", 10),
-            style=cfg.get("barStyle", "rounded"),
-            fill_color=color,
-            empty_color=theme["barEmpty"],
-            filled_char=config.get("customBarFilled"),
-            empty_char=config.get("customBarEmpty"),
-        ))
+        parts.append(
+            bars.render_bar(
+                percent,
+                width=cfg.get("barWidth", 10),
+                style=cfg.get("barStyle", "rounded"),
+                fill_color=color,
+                empty_color=theme["barEmpty"],
+                filled_char=config.get("customBarFilled"),
+                empty_char=config.get("customBarEmpty"),
+            )
+        )
 
     value_mode = cfg.get("value", "tokens")
     value = _context_value(data, percent, value_mode, color, theme)
@@ -164,13 +167,18 @@ def _seg_usage(data, config, theme) -> list[str]:
 
         piece = colorize(f"{label}:", theme["label"]) + " "
         if cfg.get("bar", False):
-            piece += bars.render_bar(
-                percent, width=cfg.get("barWidth", 8),
-                style=cfg.get("barStyle", "rounded"),
-                fill_color=color, empty_color=theme["barEmpty"],
-                filled_char=config.get("customBarFilled"),
-                empty_char=config.get("customBarEmpty"),
-            ) + " "
+            piece += (
+                bars.render_bar(
+                    percent,
+                    width=cfg.get("barWidth", 8),
+                    style=cfg.get("barStyle", "rounded"),
+                    fill_color=color,
+                    empty_color=theme["barEmpty"],
+                    filled_char=config.get("customBarFilled"),
+                    empty_char=config.get("customBarEmpty"),
+                )
+                + " "
+            )
         piece += colorize(f"{shown:.0f}%", color)
 
         if cfg.get("showReset", True) and info.resets_at:

@@ -18,6 +18,7 @@ DEFAULT_CONTEXT_WINDOW = 200_000
 @dataclass
 class Window:
     """A rate-limit window (e.g. the 5-hour or 7-day quota)."""
+
     used_percent: float | None = None
     resets_at: float | None = None  # unix seconds
 
@@ -106,6 +107,6 @@ def read_payload() -> dict[str, Any]:
     try:
         raw = sys.stdin.read()
         payload = json.loads(raw) if raw.strip() else {}
-    except (json.JSONDecodeError, ValueError):
+    except (RecursionError, ValueError):
         payload = {}
     return payload if isinstance(payload, dict) else {}

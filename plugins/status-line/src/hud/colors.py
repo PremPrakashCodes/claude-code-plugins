@@ -19,17 +19,36 @@ RESET = "\x1b[0m"
 
 # Foreground SGR codes for named colors.
 _NAMED: dict[str, int] = {
-    "black": 30, "red": 31, "green": 32, "yellow": 33,
-    "blue": 34, "magenta": 35, "cyan": 36, "white": 37,
-    "gray": 90, "grey": 90, "brightBlack": 90,
-    "brightRed": 91, "brightGreen": 92, "brightYellow": 93,
-    "brightBlue": 94, "brightMagenta": 95, "brightCyan": 96, "brightWhite": 97,
+    "black": 30,
+    "red": 31,
+    "green": 32,
+    "yellow": 33,
+    "blue": 34,
+    "magenta": 35,
+    "cyan": 36,
+    "white": 37,
+    "gray": 90,
+    "grey": 90,
+    "brightBlack": 90,
+    "brightRed": 91,
+    "brightGreen": 92,
+    "brightYellow": 93,
+    "brightBlue": 94,
+    "brightMagenta": 95,
+    "brightCyan": 96,
+    "brightWhite": 97,
 }
 
 # Text-style SGR codes.
 _STYLES: dict[str, int] = {
-    "bold": 1, "dim": 2, "faint": 2, "italic": 3,
-    "underline": 4, "blink": 5, "reverse": 7, "strike": 9,
+    "bold": 1,
+    "dim": 2,
+    "faint": 2,
+    "italic": 3,
+    "underline": 4,
+    "blink": 5,
+    "reverse": 7,
+    "strike": 9,
 }
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -51,7 +70,7 @@ def _token_code(token: str) -> str | None:
         return str(_NAMED[t])
     if t.startswith("#") and len(t) == 7:
         try:
-            r, g, b = (int(t[i:i + 2], 16) for i in (1, 3, 5))
+            r, g, b = (int(t[i : i + 2], 16) for i in (1, 3, 5))
             return f"38;2;{r};{g};{b}"
         except ValueError:
             return None

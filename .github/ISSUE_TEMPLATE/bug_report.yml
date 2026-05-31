@@ -1,0 +1,52 @@
+name: Bug report
+description: Report something that is broken or behaving unexpectedly.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Clear reproduction details help us fix it faster.
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin
+      description: Which plugin is affected?
+      placeholder: status-line
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Install ...
+        2. Run ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, shell, Python version, Claude Code version, and plugin version when relevant.
+      placeholder: |
+        OS:
+        Python:
+        Claude Code:
+        Plugin version:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant output, screenshots, or the result of `python3 src/statusline.py --demo`.
+      render: shell

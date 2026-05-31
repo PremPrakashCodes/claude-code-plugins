@@ -1,7 +1,6 @@
 import unittest
 
 import _path  # noqa: F401
-
 from hud.formatting import format_cost, format_duration, humanize_tokens
 
 

@@ -1,7 +1,6 @@
 import unittest
 
 import _path  # noqa: F401  (sets up import path)
-
 from hud import colors
 
 

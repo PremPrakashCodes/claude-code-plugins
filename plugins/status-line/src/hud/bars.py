@@ -11,7 +11,7 @@ from .colors import colorize
 
 # name -> (filled glyph, empty glyph)
 BAR_PRESETS: dict[str, tuple[str, str]] = {
-    "rounded": ("▰", "▱"),   # default, matches the reference HUD
+    "rounded": ("▰", "▱"),  # default, matches the reference HUD
     "blocks": ("█", "░"),
     "shade": ("█", "▒"),
     "bars": ("▮", "▯"),
@@ -71,14 +71,17 @@ def render_bar(
 
 
 def _two_glyph_bar(
-    percent: float, width: int, filled_glyph: str, empty_glyph: str,
-    fill_color: object, empty_color: object,
+    percent: float,
+    width: int,
+    filled_glyph: str,
+    empty_glyph: str,
+    fill_color: object,
+    empty_color: object,
 ) -> str:
     filled = round(width * percent / 100)
     filled = max(0, min(width, filled))
-    return (
-        colorize(filled_glyph * filled, fill_color)
-        + colorize(empty_glyph * (width - filled), empty_color)
+    return colorize(filled_glyph * filled, fill_color) + colorize(
+        empty_glyph * (width - filled), empty_color
     )
 
 

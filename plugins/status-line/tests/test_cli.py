@@ -4,8 +4,8 @@ from contextlib import redirect_stdout
 from unittest import mock
 
 import _path  # noqa: F401
-
-from hud import cli, data as data_mod
+from hud import cli
+from hud import data as data_mod
 
 
 def _run(argv, stdin=""):
@@ -44,10 +44,15 @@ class TestCliFailSilent(unittest.TestCase):
 
     def test_deeply_nested_stdin_does_not_crash(self):
         # json.loads raises RecursionError (not a ValueError) on deep nesting;
-        # read_payload() runs inside main's guard, so this must stay silent.
+        # read_payload() tolerates it so main can still degrade gracefully.
         hostile = "[" * 60000 + "]" * 60000
         out = _run([], stdin=hostile)
-        self.assertEqual(out, "\n")
+        self.assertNotIn("Traceback", out)
+        self.assertTrue(out.endswith("\n"))
+        # The hardening must produce a live degraded line, not a blank one:
+        # read_payload() catches the RecursionError, returns {}, and render runs.
+        self.assertNotEqual(out, "\n")
+        self.assertIn("[?]", out)
 
     def test_nan_token_count_does_not_crash(self):
         out = _run([], stdin='{"context_window": {"current_usage": {"input_tokens": NaN}}}')
@@ -63,6 +68,11 @@ class TestReadPayloadTolerance(unittest.TestCase):
     def test_malformed_json(self):
         with mock.patch("sys.stdin", io.StringIO("{not json")):
             self.assertEqual(data_mod.read_payload(), {})
+
+    def test_recursion_error_while_decoding_json(self):
+        with mock.patch("sys.stdin", io.StringIO("{}")):
+            with mock.patch("hud.data.json.loads", side_effect=RecursionError):
+                self.assertEqual(data_mod.read_payload(), {})
 
     def test_non_dict_json(self):
         with mock.patch("sys.stdin", io.StringIO("[1, 2, 3]")):

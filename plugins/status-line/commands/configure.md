@@ -16,27 +16,36 @@ preview, repeat until they're happy. Don't dump every option at once.
 
 ```bash
 echo "PLUGIN_ROOT=$CLAUDE_PLUGIN_ROOT"
-CONFIG_PATH="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/status-line/config.json"
+CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+CONFIG_PATH="$CONFIG_DIR/plugins/status-line/config.json"
 echo "CONFIG_PATH=$CONFIG_PATH"
 ```
 
 Choose the **preview command (PREVIEW)** - prefer the installed runtime, fall
-back to running the script with system Python:
+back to running the script with system Python. Keep it as a Bash array so paths
+with spaces still work:
 
 ```bash
-VENV_BIN="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/status-line/.venv/bin/status-line"
+VENV_BIN="$CONFIG_DIR/plugins/status-line/.venv/bin/status-line"
 if [ -x "$VENV_BIN" ]; then
-  PREVIEW="$VENV_BIN"
+  PREVIEW=("$VENV_BIN")
 else
-  PREVIEW="$(command -v python3 || command -v python) $CLAUDE_PLUGIN_ROOT/src/statusline.py"
+  PYBIN="$(command -v python3 || command -v python || true)"
+  if [ -z "$PYBIN" ]; then
+    echo "No Python found. Run /status-line:setup after installing Python 3.8+ or uv."
+    exit 1
+  fi
+  PREVIEW=("$PYBIN" "$CLAUDE_PLUGIN_ROOT/src/statusline.py")
 fi
-echo "PREVIEW=$PREVIEW"
+printf 'PREVIEW='
+printf '%q ' "${PREVIEW[@]}"
+printf '\n'
 ```
 
 Render the current config any time with:
 
 ```bash
-$PREVIEW --demo --config "$CONFIG_PATH"
+"${PREVIEW[@]}" --demo --config "$CONFIG_PATH"
 ```
 
 (If the file doesn't exist yet, the preview uses built-in defaults - that's fine;
@@ -55,8 +64,9 @@ your first write creates it.)
 
 Pick the questions that match what the user wants.
 
-1. **Preset** - `minimal`, `essential`, or `full`. Apply by merging
-   `PRESETS[name]` over the current config.
+1. **Preset** - `minimal`, `essential`, or `full`. Apply with the preset helper
+   below so previous preset-only keys are cleared before the new preset is
+   merged.
 
 2. **Segments & order** - which of `model, project, git, context, usage, cost,
    session` to show and in what order (the `"segments"` array; order matters,
@@ -65,8 +75,9 @@ Pick the questions that match what the user wants.
 3. **Progress-bar style** - `"context.barStyle"` (and optionally
    `"usage.barStyle"`). Valid values:
    `rounded, blocks, shade, bars, dots, line, equals, hash, ascii, arrows, smooth, braille`.
-   List them live: `$PREVIEW --styles`. To show them side by side, preview a tiny
-   temp config per style. Bar width is `"context.barWidth"` / `"usage.barWidth"`.
+   List them live: `"${PREVIEW[@]}" --styles`. To show them side by side,
+   preview a tiny temp config per style. Bar width is `"context.barWidth"` /
+   `"usage.barWidth"`.
 
 4. **Context value** - `"context.value"`: `tokens` (86k/1.0M), `percent`,
    `both`, or `none`. Label via `"context.label"` (default `ctx`).
@@ -98,48 +109,96 @@ Merge changes into the existing JSON and write with 2-space indent. Edit the
 marked block to apply the user's chosen keys:
 
 ```bash
-PYBIN="$(command -v python3 || command -v python)"
+VENV_PY="$CONFIG_DIR/plugins/status-line/.venv/bin/python"
+if [ -x "$VENV_PY" ]; then
+  PYBIN="$VENV_PY"
+else
+  PYBIN="$(command -v python3 || command -v python)"
+fi
 "$PYBIN" - <<'PY'
 import json, os
-p = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", os.path.expanduser("~/.claude")),
-                 "plugins", "status-line", "config.json")
-os.makedirs(os.path.dirname(p), exist_ok=True)
+from pathlib import Path
+
+p = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude")).expanduser()
+p = p / "plugins" / "status-line" / "config.json"
 cfg = {}
-if os.path.exists(p):
+if p.exists():
     try:
-        cfg = json.load(open(p))
-    except Exception:
-        cfg = {}
+        cfg = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"config.json is not valid JSON: {exc}")
+    if not isinstance(cfg, dict):
+        raise SystemExit("config.json must contain a JSON object")
 
 # --- merge the user's chosen changes into cfg here ---
 cfg.setdefault("context", {})["barStyle"] = "blocks"
 cfg.setdefault("usage", {}).setdefault("labels", {})["7d"] = "weekly"
 # ----------------------------------------------------
 
-json.dump(cfg, open(p, "w"), indent=2)
+p.parent.mkdir(parents=True, exist_ok=True)
+p.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
 print("saved", p)
 PY
 ```
 
-To **apply a preset**, merge it instead of setting individual keys:
+To **apply a preset**, replace the keys controlled by presets, then merge the
+selected preset. This lets switching from `minimal` back to `essential` restore
+default git/session behavior while preserving unrelated custom keys like theme,
+colors, labels, and bar styles:
 
 ```bash
-PYBIN="$(command -v python3 || command -v python)"
+VENV_PY="$CONFIG_DIR/plugins/status-line/.venv/bin/python"
+if [ -x "$VENV_PY" ]; then
+  PYBIN="$VENV_PY"
+else
+  PYBIN="$(command -v python3 || command -v python)"
+fi
 PRESET=full   # minimal | essential | full
 "$PYBIN" - "$PRESET" <<'PY'
 import json, os, sys
+from pathlib import Path
+
 sys.path.insert(0, os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], "src"))
 from hud import config as c
-p = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", os.path.expanduser("~/.claude")),
-                 "plugins", "status-line", "config.json")
+
+p = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude")).expanduser()
+p = p / "plugins" / "status-line" / "config.json"
+name = sys.argv[1]
+if name not in c.PRESETS:
+    raise SystemExit(f"unknown preset: {name}")
+
 cfg = {}
-if os.path.exists(p):
-    try: cfg = json.load(open(p))
-    except Exception: cfg = {}
-cfg = c._deep_merge(cfg, c.PRESETS.get(sys.argv[1], {}))
-os.makedirs(os.path.dirname(p), exist_ok=True)
-json.dump(cfg, open(p, "w"), indent=2)
-print("applied preset", sys.argv[1])
+if p.exists():
+    try:
+        cfg = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"config.json is not valid JSON: {exc}")
+    if not isinstance(cfg, dict):
+        raise SystemExit("config.json must contain a JSON object")
+
+def leaf_paths(value, prefix=()):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from leaf_paths(child, prefix + (key,))
+    else:
+        yield prefix
+
+def drop_path(target, path):
+    cur = target
+    for key in path[:-1]:
+        cur = cur.get(key)
+        if not isinstance(cur, dict):
+            return
+    cur.pop(path[-1], None)
+
+for preset in c.PRESETS.values():
+    for path in leaf_paths(preset):
+        drop_path(cfg, path)
+
+cfg = c._deep_merge(cfg, c.PRESETS[name])
+p.parent.mkdir(parents=True, exist_ok=True)
+p.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+print("applied preset", name)
 PY
 ```
 

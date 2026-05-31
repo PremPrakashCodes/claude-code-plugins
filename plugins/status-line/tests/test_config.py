@@ -4,7 +4,6 @@ import unittest
 from pathlib import Path
 
 import _path  # noqa: F401
-
 from hud import config as config_mod
 
 
@@ -25,10 +24,15 @@ class TestConfig(unittest.TestCase):
     def test_load_merges_partial_file(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "config.json"
-            p.write_text(json.dumps({
-                "theme": "nord",
-                "usage": {"labels": {"7d": "weekly"}},
-            }))
+            p.write_text(
+                json.dumps(
+                    {
+                        "theme": "nord",
+                        "usage": {"labels": {"7d": "weekly"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
             cfg = config_mod.load(p)
         self.assertEqual(cfg["theme"], "nord")
         self.assertEqual(cfg["usage"]["labels"]["7d"], "weekly")
@@ -39,7 +43,7 @@ class TestConfig(unittest.TestCase):
     def test_load_invalid_json_falls_back(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "config.json"
-            p.write_text("{ not valid json ")
+            p.write_text("{ not valid json ", encoding="utf-8")
             cfg = config_mod.load(p)
         self.assertEqual(cfg["theme"], "default")
 
@@ -59,6 +63,7 @@ class TestConfig(unittest.TestCase):
 
     def test_config_path_respects_env(self):
         import os
+
         old = os.environ.get("CLAUDE_CONFIG_DIR")
         os.environ["CLAUDE_CONFIG_DIR"] = "/tmp/xyz"
         try:
@@ -73,7 +78,7 @@ class TestConfig(unittest.TestCase):
     def test_shipped_config_matches_defaults(self):
         """The bundled config.json must stay in sync with DEFAULTS."""
         shipped = Path(__file__).resolve().parent.parent / "config.json"
-        loaded = json.loads(shipped.read_text())
+        loaded = json.loads(shipped.read_text(encoding="utf-8"))
         merged = config_mod._deep_merge(config_mod.DEFAULTS, loaded)
         self.assertEqual(merged, config_mod._deep_merge(config_mod.DEFAULTS, config_mod.DEFAULTS))
 
