@@ -21,9 +21,18 @@ Then install a plugin from the marketplace:
 
 ## Plugins
 
-| Plugin | Description | Status |
-| ------ | ----------- | ------ |
-| [status-line](plugins/status-line) | Configurable status-line HUD for Claude Code: model, project, git, context usage, rate-limit windows, cost, and session details. Pure Python, standard library only. | Stable initial release |
+| Plugin | Description |
+| ------ | ----------- |
+| [status-line](plugins/status-line) | Configurable status-line HUD for Claude Code: model, project, git, context usage, rate-limit windows, cost, and session details. Pure Python, standard library only. |
+
+The HUD renders a compact, single-line view of your session:
+
+```text
+[Opus 4.8] | claude | ctx ▰▱▱▱▱▱▱▱▱▱ 86k/1.0M | 5h: 6% (2h 16m) | 7d: 44% (3d 5h)
+```
+
+Preview it yourself without installing — see
+[Preview the status line](#development-setup).
 
 ## Repository Layout
 
