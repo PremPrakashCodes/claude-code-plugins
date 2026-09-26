@@ -40,11 +40,89 @@ The router leaves a dispatch unchanged when:
 - the pick would be pricier than the model it would already use (the session
   model, which subagents without a pinned model inherit - built-in Explore
   included);
+- the session model or the picked model is not a known family, so the router
+  cannot prove the switch is cheaper;
 - the classifier fails or times out.
 
 Main-session prompts are never classified. No hook can switch the main-session
 model, so an advisory would only add the classifier's cost on top of the model
 that answers anyway.
+
+### Flow
+
+```text
+ MAIN SESSION (e.g. Opus)          no router hook on your prompts: no cost, no delay
+ ──────────────────────────
+  you: "fix the login bug"
+          │
+          ▼
+  Claude decides to use a subagent (Agent / Task tool)
+          │
+          │  PreToolUse hook  ──►  router.py route-task
+          ▼
+ ┌───────────────────────────── ROUTE-TASK ─────────────────────────────┐
+ │                                                                      │
+ │  1. Did the user already choose the model?                           │
+ │     • `model` set on the dispatch                                    │
+ │     • `model:` in the agent's .md frontmatter             ── yes ──► KEEP
+ │     • CLAUDE_CODE_SUBAGENT_MODEL env var                  (override) │
+ │                        │ no                                          │
+ │                        ▼                                             │
+ │  2. Ask the classifier ────────────────────────────┐                 │
+ │                                                    ▼                 │
+ │                        ┌────────── classifier (nested claude -p) ──┐ │
+ │                        │ model: haiku   safe-mode, no tools,       │ │
+ │                        │ thinking off, hooks disabled,             │ │
+ │                        │ AGENT_ROUTER_NESTED=1                     │ │
+ │                        │ input: type + description + 4k of prompt  │ │
+ │                        │ output: {"tier":"low|mid|high"}           │ │
+ │                        │ ~2-4 s, ~$0.004                           │ │
+ │                        └───────────────────────────────────────────┘ │
+ │                        │ fail/timeout (6 s)  ──────────────────────► KEEP
+ │                        ▼                                   (fallback)│
+ │  3. tier ─► model:   low ─► haiku   mid ─► sonnet   high ─► opus     │
+ │                        │                                             │
+ │  4. Compare with the model it would otherwise use (the session       │
+ │     model, read from the transcript):                                │
+ │     • either model family unknown  ──────────────────────────────►  KEEP
+ │     • pick is pricier than the session model  ───────────────────►  KEEP
+ │     • pick is the same model  ───────────────────────────────────►  KEEP
+ │     • pick is cheaper  ───────────────┐                              │
+ └───────────────────────────────────────┼──────────────────────────────┘
+                                         ▼
+                 REWRITE: updatedInput = original input + {"model": "haiku"}
+                                         │
+                                         ▼
+                 subagent runs on the cheaper model  (Opus ─► Haiku)
+
+   every path above appends a "decision" record ─────┐
+                                                     ▼
+ ┌──────────────────────── OUTCOME CAPTURE ─────────────────────────────┐
+ │  PostToolUse     ─► "link"          tool_use_id ↔ agentId, model     │
+ │  SubagentStop    ─► "subagent_stop" path to the subagent transcript  │
+ │  Stop (turn end) ─► read transcript ─► "outcome": tokens, duration   │
+ │                  ─► session totals ─► summary.json (locked, atomic)  │
+ └──────────────────────────────────────────────────────────────────────┘
+                     │                                 │
+                     ▼                                 ▼
+   ~/.claude/plugins/data/agent-router/     ~/.claude/plugins/agent-router/
+   log.jsonl (+ log.1..3, 5 MB rotation)    summary.json (last 50 sessions)
+   (no prompt text, only a hash and sizes)
+                     │                                 │
+                     ▼                                 ▼
+   /agent-router:report                      status-line `router` segment
+   ─────────────────────                     ──────────────────────────────
+   decisions: LLM / override / fallback      [Opus 5] | ctx 9% | router: 4↓ $0.38 saved
+   classifier cost + avg latency
+   net savings (estimate) =
+     cost on the session model
+   − cost on the routed model
+   − classifier cost
+```
+
+Every hook error, timeout, or unreadable file exits cleanly and leaves the
+dispatch unchanged. Two guards (`disableAllHooks` and `AGENT_ROUTER_NESTED`)
+keep the classifier's own `claude -p` session from re-entering the router.
 
 ## Commands
 
