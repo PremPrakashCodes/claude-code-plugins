@@ -54,6 +54,25 @@ that answers anyway.
 | `/agent-router:configure` | Change tier models, turn the classifier off or change its model and timeout, log retention, or the price table |
 | `/agent-router:report` | Routed dispatches, classifier cost, and estimated net savings |
 
+## Savings in the status line
+
+With the [status-line](../status-line) plugin installed, add `router` to its
+`segments` to see this session's routing at a glance:
+
+```text
+[Opus 5] | claude | ctx ▰▱▱▱▱▱▱▱▱▱ 9% | router: 4↓ $0.38 saved
+```
+
+`4↓` is the number of subagent dispatches moved to a cheaper model this session;
+the dollar figure is the estimated net saving after classifier cost (the same
+estimate `report` shows). After each turn the router writes these totals to
+`${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/agent-router/summary.json` (the most
+recent 50 sessions), which the segment reads. The segment stays hidden until
+something is routed.
+
+Routing saves money, not context: a subagent's work stays out of the main
+session's context whichever model it runs on.
+
 ## Configuration
 
 `${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/agent-router/config.json`, deep-merged

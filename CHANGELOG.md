@@ -14,6 +14,8 @@ and plugin versions should follow [Semantic Versioning](https://semver.org/).
 - `agent-router` plugin: AI-classified model routing for Claude's subagent
   dispatches. Rewrites each dispatch's model to the cheapest capable tier and
   logs every routing decision and its cost locally.
+- `status-line` `router` segment: shows the current session's routed dispatches
+  and estimated net savings from `agent-router` (opt-in via `segments`).
 
 ## [0.1.0] - 2026-05-31
 

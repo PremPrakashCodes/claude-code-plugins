@@ -21,6 +21,7 @@ from . import hooks as hooks_mod
 from . import log as log_mod
 from . import outcomes as outcomes_mod
 from . import report as report_mod
+from . import summary as summary_mod
 from .classifier import NESTED_ENV
 
 USAGE = f"""agent-router {__version__}
@@ -40,6 +41,22 @@ User subcommands:
 HOOK_COMMANDS = ("route-task", "record-outcome")
 
 
+def _finish_turn(payload: dict[str, Any], config: dict[str, Any]) -> None:
+    """Stop: resolve this session's finished subagents and refresh its summary."""
+    session_id = payload.get("session_id")
+    if not isinstance(session_id, str) or not session_id:
+        return
+    # Stop runs every turn: read only the live log, not rotated history.
+    session_records = [
+        r for r in log_mod.read_records(include_rotated=False) if r.get("session_id") == session_id
+    ]
+    new_outcomes, totals = hooks_mod.finish_turn(session_id, session_records, config)
+    for record in new_outcomes:
+        log_mod.append(record, config)
+    if totals is not None:
+        summary_mod.update(session_id, routed=totals[0], net_savings_usd=totals[1])
+
+
 def _run_hook(command: str) -> None:
     payload = data_mod.read_payload()
     config = config_mod.load()
@@ -48,10 +65,10 @@ def _run_hook(command: str) -> None:
     if command == "route-task":
         reply, records = hooks_mod.route_task(payload, config)
     elif command == "record-outcome":
-        # Stop runs every turn: stream only the live log, not rotated history.
-        records = hooks_mod.record_outcome(
-            payload, lambda: log_mod.read_records(include_rotated=False)
-        )
+        if payload.get("hook_event_name") == "Stop":
+            _finish_turn(payload, config)
+            return
+        records = hooks_mod.record_outcome(payload)
     for record in records:
         log_mod.append(record, config)
     if reply is not None:

@@ -15,6 +15,7 @@ from typing import Any, Callable
 from . import classifier as classifier_mod
 from . import data as data_mod
 from . import outcomes as outcomes_mod
+from . import report as report_mod
 from .config import tier_model
 
 # Claude Code's setting for a default subagent model; a user-chosen default is
@@ -126,14 +127,8 @@ def route_task(
     return reply, [_decision(event, action="rewrite", model=target, **fields)]
 
 
-def record_outcome(
-    payload: dict[str, Any],
-    existing: Callable[[], Any],
-) -> list[dict[str, Any]]:
-    """PostToolUse / SubagentStop / Stop: records that capture dispatch outcomes.
-
-    ``existing`` returns the log's current records; it is only read on ``Stop``.
-    """
+def record_outcome(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """PostToolUse / SubagentStop: records that link a dispatch to its outcome."""
     if not isinstance(payload, dict):
         return []
     event_name = payload.get("hook_event_name")
@@ -145,9 +140,19 @@ def record_outcome(
     if event_name == "SubagentStop":
         stop = outcomes_mod.stop_record(payload)
         return [stop] if stop else []
-    if event_name == "Stop":
-        session_id = payload.get("session_id")
-        return outcomes_mod.resolve_pending(
-            existing(), session_id if isinstance(session_id, str) and session_id else None
-        )
     return []
+
+
+def finish_turn(
+    session_id: str, session_records: list[dict[str, Any]], config: dict[str, Any]
+) -> tuple[list[dict[str, Any]], tuple[int, float] | None]:
+    """Stop: new outcome records, plus the session's (routed, net savings) totals.
+
+    Totals are None when the session has made no routing decisions, so sessions
+    that never dispatched a subagent leave no summary behind.
+    """
+    new_outcomes = outcomes_mod.resolve_pending(session_records, session_id)
+    if not any(r.get("kind") == "decision" for r in session_records):
+        return new_outcomes, None
+    totals = report_mod.summarize(session_records + new_outcomes, config)
+    return new_outcomes, (totals["rewrites"], totals["net_savings_usd"])
