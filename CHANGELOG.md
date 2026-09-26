@@ -11,6 +11,9 @@ and plugin versions should follow [Semantic Versioning](https://semver.org/).
 
 - Open-source project documentation, contribution guidance, community standards,
   templates, and development quality checks.
+- `agent-router` plugin: rules-first model routing for Claude Code. Rewrites the
+  model on Claude's subagent dispatches, shows a per-prompt model advisory, and
+  logs every routing decision locally.
 
 ## [0.1.0] - 2026-05-31
 

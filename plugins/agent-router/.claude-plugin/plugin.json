@@ -1,0 +1,11 @@
+{
+  "name": "agent-router",
+  "description": "Model-routing layer for Claude Code: classifies each task with rules first (LLM fallback only for ambiguous subagent dispatches), routes Claude's subagent dispatches to the cheapest capable model, shows a per-prompt model advisory, and logs every decision locally. Pure Python, standard library only.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Prem Prakash Sharma",
+    "url": "https://github.com/PremPrakashCodes"
+  },
+  "commands": ["./commands/setup.md", "./commands/configure.md", "./commands/report.md"],
+  "license": "MIT"
+}
