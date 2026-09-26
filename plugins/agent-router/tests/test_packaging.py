@@ -44,7 +44,7 @@ class TestPackaging(unittest.TestCase):
             timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("classify-prompt", result.stdout)
+        self.assertIn("route-task", result.stdout)
 
 
 if __name__ == "__main__":

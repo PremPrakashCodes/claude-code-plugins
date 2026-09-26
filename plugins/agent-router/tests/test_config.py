@@ -13,7 +13,6 @@ class TestConfig(unittest.TestCase):
         cfg = config_mod.load(Path("/nonexistent/whatever.json"))
         self.assertEqual(cfg, config_mod.DEFAULTS)
         self.assertEqual(cfg["tiers"], {"low": "haiku", "mid": "sonnet", "high": "opus"})
-        self.assertEqual(cfg["rules"]["threshold"], 0.7)
         self.assertTrue(cfg["classifier"]["enabled"])
         self.assertEqual(cfg["classifier"]["model"], "haiku")
         self.assertEqual(cfg["log"]["maxBytes"], 5_000_000)
@@ -21,10 +20,10 @@ class TestConfig(unittest.TestCase):
     def test_partial_config_deep_merges(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "config.json"
-            p.write_text(json.dumps({"tiers": {"low": "sonnet"}, "rules": {"threshold": 0.5}}))
+            p.write_text(json.dumps({"tiers": {"low": "sonnet"}, "log": {"maxBytes": 10}}))
             cfg = config_mod.load(p)
         self.assertEqual(cfg["tiers"], {"low": "sonnet", "mid": "sonnet", "high": "opus"})
-        self.assertEqual(cfg["rules"]["threshold"], 0.5)
+        self.assertEqual(cfg["log"]["maxBytes"], 10)
         # untouched nested defaults survive
         self.assertEqual(cfg["classifier"]["timeoutSeconds"], 6)
 

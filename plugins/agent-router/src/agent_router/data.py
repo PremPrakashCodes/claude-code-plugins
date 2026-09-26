@@ -17,7 +17,6 @@ from typing import Any
 # The subagent tool is "Agent" in current Claude Code and "Task" in older builds.
 DISPATCH_TOOLS = ("Agent", "Task")
 
-_TASK_NOTIFICATION = "<task-notification>"
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 _FAMILIES = ("haiku", "sonnet", "opus", "fable", "mythos")
 
@@ -43,34 +42,6 @@ def read_payload() -> dict[str, Any]:
     except (RecursionError, ValueError, OSError):
         payload = {}
     return payload if isinstance(payload, dict) else {}
-
-
-@dataclass
-class PromptEvent:
-    """A UserPromptSubmit payload."""
-
-    prompt: str = ""
-    session_id: str = ""
-    prompt_id: str = ""
-    transcript_path: str = ""
-    cwd: str = ""
-
-    @property
-    def is_task_notification(self) -> bool:
-        # UserPromptSubmit also fires when a background task reports back; those
-        # turns are not user prompts and must not get an advisory.
-        return self.prompt.lstrip().startswith(_TASK_NOTIFICATION)
-
-
-def parse_prompt(payload: dict[str, Any]) -> PromptEvent:
-    d = payload if isinstance(payload, dict) else {}
-    return PromptEvent(
-        prompt=_str(d.get("prompt")),
-        session_id=_str(d.get("session_id")),
-        prompt_id=_str(d.get("prompt_id")),
-        transcript_path=_str(d.get("transcript_path")),
-        cwd=_str(d.get("cwd")),
-    )
 
 
 @dataclass

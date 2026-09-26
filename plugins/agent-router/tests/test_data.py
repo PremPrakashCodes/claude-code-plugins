@@ -31,37 +31,6 @@ class TestReadPayload(unittest.TestCase):
         self.assertEqual(self._read("[" * 100000 + "]" * 100000), {})
 
 
-class TestPromptEvent(unittest.TestCase):
-    def test_parses_fields(self):
-        ev = data.parse_prompt(
-            {
-                "hook_event_name": "UserPromptSubmit",
-                "prompt": "reformat imports",
-                "session_id": "s1",
-                "prompt_id": "p1",
-                "transcript_path": "/t.jsonl",
-                "cwd": "/repo",
-            }
-        )
-        self.assertEqual(ev.prompt, "reformat imports")
-        self.assertEqual(ev.session_id, "s1")
-        self.assertEqual(ev.prompt_id, "p1")
-        self.assertFalse(ev.is_task_notification)
-
-    def test_task_notification_is_flagged(self):
-        ev = data.parse_prompt({"prompt": "<task-notification>\n<task-id>a1</task-id>"})
-        self.assertTrue(ev.is_task_notification)
-
-    def test_missing_fields_default(self):
-        ev = data.parse_prompt({})
-        self.assertEqual(ev.prompt, "")
-        self.assertEqual(ev.session_id, "")
-
-    def test_non_string_prompt(self):
-        ev = data.parse_prompt({"prompt": {"x": 1}})
-        self.assertEqual(ev.prompt, "")
-
-
 class TestDispatchEvent(unittest.TestCase):
     def test_parses_agent_dispatch(self):
         ev = data.parse_dispatch(

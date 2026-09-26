@@ -1,9 +1,13 @@
 # agent-router
 
-A model-routing layer for Claude Code. It classifies each task with a
-rules-first engine, rewrites the model on Claude's own subagent dispatches to
-the cheapest capable tier, shows a per-prompt model advisory for the main
-session, and logs every routing decision locally.
+A model-routing layer for Claude Code. It classifies each of Claude's subagent
+dispatches with a fast AI classifier (Haiku by default), rewrites that dispatch's
+model to the cheapest capable tier, and logs every routing decision locally,
+including what the classifier itself cost.
+
+Main-session prompts are never classified: no hook can switch the main-session
+model, so classifying them would only add cost on top of the model that answers
+anyway.
 
 Pure Python, standard library only (Python 3.8+).
 

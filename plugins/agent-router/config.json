@@ -4,17 +4,6 @@
     "mid": "sonnet",
     "high": "opus"
   },
-  "advisory": {
-    "enabled": true
-  },
-  "routing": {
-    "subagents": true
-  },
-  "rules": {
-    "threshold": 0.7,
-    "shortChars": 200,
-    "longChars": 2000
-  },
   "classifier": {
     "enabled": true,
     "model": "haiku",

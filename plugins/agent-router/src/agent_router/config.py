@@ -14,26 +14,16 @@ import os
 from pathlib import Path
 from typing import Any
 
-# Tier names, cheapest first. Rules and the classifier both return one of these.
+# Tier names, cheapest first. The classifier returns one of these.
 TIERS = ("low", "mid", "high")
 
 DEFAULTS: dict[str, Any] = {
     # Tier -> Claude Code model alias. Aliases (never full model IDs) so new
     # model versions resolve automatically.
     "tiers": {"low": "haiku", "mid": "sonnet", "high": "opus"},
-    # Main-session advisory shown on UserPromptSubmit (rules only, never LLM).
-    "advisory": {"enabled": True},
-    # Subagent model rewriting on PreToolUse (Task/Agent dispatches).
-    "routing": {"subagents": True},
-    "rules": {
-        # A rules result at or above this confidence routes without the LLM.
-        "threshold": 0.7,
-        # Prompt-size bands, in characters.
-        "shortChars": 200,
-        "longChars": 2000,
-    },
-    # LLM fallback for ambiguous subagent dispatches: a minimal headless
-    # `claude -p` call. Timeout is set from the measured ~3 s call latency.
+    # AI classifier for subagent dispatches: a minimal headless `claude -p`
+    # call. Main-session prompts are never classified. Disabling it turns
+    # routing off. Timeout is set from the measured ~3 s call latency.
     "classifier": {"enabled": True, "model": "haiku", "timeoutSeconds": 6},
     # Routing log: rotated by rename when it passes maxBytes; keepSegments old
     # segments are kept (log.1.jsonl ... log.N.jsonl).

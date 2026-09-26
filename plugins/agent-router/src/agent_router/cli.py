@@ -16,13 +16,12 @@ USAGE = f"""agent-router {__version__}
 Usage: agent-router <subcommand> [options]
 
 Hook subcommands (read the hook JSON payload on stdin):
-  classify-prompt   UserPromptSubmit: rules-only model advisory for the prompt
-  route-task        PreToolUse on Task/Agent: rewrite the subagent's model
+  route-task        PreToolUse on Task/Agent: classify and rewrite the subagent's model
   record-outcome    PostToolUse / SubagentStop / Stop: log tokens and duration
 
 User subcommands:
   report            summarize the routing log
-  eval              score the rules engine against the golden task set
+  eval              score the classifier against the golden task set
 """
 
 
