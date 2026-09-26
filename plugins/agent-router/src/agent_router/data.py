@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .config import claude_config_dir
+
 # The subagent tool is "Agent" in current Claude Code and "Task" in older builds.
 DISPATCH_TOOLS = ("Agent", "Task")
 
@@ -105,10 +107,6 @@ def parse_dispatch(payload: dict[str, Any]) -> DispatchEvent:
 # ---------------------------------------------------------------------------
 
 
-def _config_dir() -> Path:
-    return Path(os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude"))
-
-
 def _frontmatter_model(path: Path) -> str | None:
     try:
         text = path.read_text(encoding="utf-8")
@@ -134,14 +132,14 @@ def _agent_files(subagent_type: str, cwd: str) -> list[Path]:
     if sep:
         if not (_SAFE_NAME.match(plugin) and _SAFE_NAME.match(name)) or ".." in subagent_type:
             return []
-        cache = _config_dir() / "plugins" / "cache"
+        cache = claude_config_dir() / "plugins" / "cache"
         return sorted(cache.glob(f"*/{plugin}/*/agents/{name}.md"))
     if not _SAFE_NAME.match(subagent_type) or ".." in subagent_type:
         return []
     candidates = []
     if cwd:
         candidates.append(Path(cwd) / ".claude" / "agents" / f"{subagent_type}.md")
-    candidates.append(_config_dir() / "agents" / f"{subagent_type}.md")
+    candidates.append(claude_config_dir() / "agents" / f"{subagent_type}.md")
     return candidates
 
 

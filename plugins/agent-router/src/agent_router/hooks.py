@@ -111,15 +111,19 @@ def route_task(
     fields["baseline_model"] = baseline
     target_family = data_mod.model_family(target)
     baseline_family = data_mod.model_family(baseline)
-    if target_family and baseline_family:
-        target_rank = data_mod.FAMILY_RANK.get(target_family, 99)
-        baseline_rank = data_mod.FAMILY_RANK.get(baseline_family, 99)
-        if target_rank > baseline_rank:
-            record = _decision(event, action="kept", model=baseline, reason="no_upgrade", **fields)
-            return None, [record]
-        if target_family == baseline_family:
-            record = _decision(event, action="kept", model=baseline, reason="same_model", **fields)
-            return None, [record]
+    if not (target_family and baseline_family):
+        # Without both families the router cannot prove the rewrite is not an
+        # upgrade, so it fails closed and leaves the dispatch alone.
+        record = _decision(event, action="kept", reason="unknown_model_family", **fields)
+        return None, [record]
+    target_rank = data_mod.FAMILY_RANK[target_family]
+    baseline_rank = data_mod.FAMILY_RANK[baseline_family]
+    if target_rank > baseline_rank:
+        record = _decision(event, action="kept", model=baseline, reason="no_upgrade", **fields)
+        return None, [record]
+    if target_family == baseline_family:
+        record = _decision(event, action="kept", model=baseline, reason="same_model", **fields)
+        return None, [record]
 
     updated = dict(event.tool_input)  # updatedInput replaces the whole input
     updated["model"] = target

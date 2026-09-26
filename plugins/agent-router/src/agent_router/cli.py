@@ -46,9 +46,10 @@ def _finish_turn(payload: dict[str, Any], config: dict[str, Any]) -> None:
     session_id = payload.get("session_id")
     if not isinstance(session_id, str) or not session_id:
         return
-    # Stop runs every turn: read only the live log, not rotated history.
+    # Stop runs every turn: read the live log plus the newest rotated segment
+    # (so one rotation mid-session loses nothing), not the full history.
     session_records = [
-        r for r in log_mod.read_records(include_rotated=False) if r.get("session_id") == session_id
+        r for r in log_mod.read_records(recent_segments=1) if r.get("session_id") == session_id
     ]
     new_outcomes, totals = hooks_mod.finish_turn(session_id, session_records, config)
     for record in new_outcomes:

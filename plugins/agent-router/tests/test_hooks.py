@@ -174,17 +174,34 @@ class TestRouteTask(EnvCase):
         self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "sonnet")
         self.assertEqual(records[0]["baseline_model"], "claude-opus-5")
 
-    def test_unknown_session_model_still_routes(self):
-        reply, _ = hooks.route_task(
+    def test_unknown_session_model_keeps_dispatch(self):
+        # Without a known baseline the rewrite could be an upgrade: fail closed
+        reply, records = hooks.route_task(
             dispatch_payload(), cfg(), classify=classify_as("mid"), session_model=session(None)
         )
-        self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "sonnet")
+        self.assertIsNone(reply)
+        self.assertEqual(records[0]["reason"], "unknown_model_family")
+
+    def test_unrecognized_tier_model_keeps_dispatch(self):
+        config = cfg()
+        config["tiers"]["low"] = "custom-cheap-model"
+        reply, records = hooks.route_task(
+            dispatch_payload(),
+            config,
+            classify=classify_as("low"),
+            session_model=session("claude-opus-5"),
+        )
+        self.assertIsNone(reply)
+        self.assertEqual(records[0]["reason"], "unknown_model_family")
 
     def test_custom_tier_mapping(self):
         config = cfg()
         config["tiers"]["low"] = "sonnet"
         reply, _ = hooks.route_task(
-            dispatch_payload(), config, classify=classify_as("low"), session_model=session(None)
+            dispatch_payload(),
+            config,
+            classify=classify_as("low"),
+            session_model=session("claude-opus-5"),
         )
         self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "sonnet")
 
@@ -211,7 +228,7 @@ class TestRouteTask(EnvCase):
         payload = dispatch_payload()
         payload["tool_name"] = "Task"
         reply, _ = hooks.route_task(
-            payload, cfg(), classify=classify_as("low"), session_model=session(None)
+            payload, cfg(), classify=classify_as("low"), session_model=session("claude-opus-5")
         )
         self.assertIsNotNone(reply)
 
@@ -324,7 +341,7 @@ class TestCli(EnvCase):
             cli.hooks_mod,
             "route_task",
             lambda p, c: real_route_task(
-                p, c, classify=classify_as("low"), session_model=session(None)
+                p, c, classify=classify_as("low"), session_model=session("claude-opus-5")
             ),
         ):
             code, out = run_cli(dispatch_payload())

@@ -20,6 +20,8 @@ import os
 from pathlib import Path
 from typing import Any, Iterator
 
+from .config import claude_config_dir
+
 try:  # POSIX only; on other platforms rotation runs unlocked.
     import fcntl
 except ImportError:  # pragma: no cover - exercised on Windows only
@@ -33,8 +35,7 @@ def data_dir() -> Path:
     plugin_data = os.environ.get("CLAUDE_PLUGIN_DATA")
     if plugin_data:
         return Path(plugin_data)
-    base = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    return Path(base) / "plugins" / "data" / "agent-router"
+    return claude_config_dir() / "plugins" / "data" / "agent-router"
 
 
 def log_path() -> Path:
@@ -53,7 +54,8 @@ def _int_setting(config: dict[str, Any], key: str, default: int, minimum: int) -
 
 
 @contextlib.contextmanager
-def _locked(path: Path) -> Iterator[None]:
+def locked(path: Path) -> Iterator[None]:
+    """Hold an exclusive lock on ``<path>.lock`` (best effort; POSIX only)."""
     if fcntl is None:
         yield
         return
@@ -90,7 +92,7 @@ def append(record: dict[str, Any], config: dict[str, Any], path: Path | None = N
     keep = _int_setting(config, "keepSegments", DEFAULT_KEEP_SEGMENTS, 0)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        with _locked(target):
+        with locked(target):
             try:
                 if target.stat().st_size >= max_bytes:
                     _rotate(target, keep)
@@ -118,20 +120,20 @@ def _read_file(path: Path) -> Iterator[dict[str, Any]]:
 
 
 def read_records(
-    path: Path | None = None, include_rotated: bool = True
+    path: Path | None = None, recent_segments: int | None = None
 ) -> Iterator[dict[str, Any]]:
-    """Yield every record, oldest segment first, skipping unreadable lines.
+    """Yield records, oldest segment first, skipping unreadable lines.
 
-    ``include_rotated=False`` reads only the live log - enough for per-turn work
-    about the current session, whose records were written moments earlier.
+    ``recent_segments`` limits how many rotated segments are read besides the
+    live log (``None`` reads them all). Per-turn work about the current session
+    needs only the newest one or two files, not the full retained history.
     """
     target = path or log_path()
-    if not include_rotated:
-        yield from _read_file(target)
-        return
     segments = []
     index = 1
     while _segment(target, index).exists():
+        if recent_segments is not None and index > recent_segments:
+            break
         segments.append(_segment(target, index))
         index += 1
     for segment in reversed(segments):

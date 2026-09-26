@@ -21,13 +21,15 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .config import claude_config_dir
+from .log import locked
+
 VERSION = 1
 MAX_SESSIONS = 50
 
 
 def summary_path() -> Path:
-    base = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    return Path(base) / "plugins" / "agent-router" / "summary.json"
+    return claude_config_dir() / "plugins" / "agent-router" / "summary.json"
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -44,28 +46,31 @@ def update(session_id: str, routed: int, net_savings_usd: float) -> bool:
     if not session_id:
         return False
     path = summary_path()
-    sessions = _load(path)
-    sessions[session_id] = {
-        "routed": routed,
-        "net_savings_usd": round(net_savings_usd, 6),
-        "updated": time.time(),
-    }
-    recent = sorted(
-        sessions.items(),
-        key=lambda item: item[1].get("updated", 0) if isinstance(item[1], dict) else 0,
-        reverse=True,
-    )[:MAX_SESSIONS]
-    payload = json.dumps({"version": VERSION, "sessions": dict(recent)}, indent=2)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".summary-", suffix=".json")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(payload + "\n")
-            os.replace(tmp, path)
-        except OSError:
-            os.unlink(tmp)
-            raise
+        # Stop hooks from concurrent sessions each rewrite this shared file;
+        # the lock keeps one session's update from dropping another's.
+        with locked(path):
+            sessions = _load(path)
+            sessions[session_id] = {
+                "routed": routed,
+                "net_savings_usd": round(net_savings_usd, 6),
+                "updated": time.time(),
+            }
+            recent = sorted(
+                sessions.items(),
+                key=lambda item: item[1].get("updated", 0) if isinstance(item[1], dict) else 0,
+                reverse=True,
+            )[:MAX_SESSIONS]
+            payload = json.dumps({"version": VERSION, "sessions": dict(recent)}, indent=2)
+            fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".summary-", suffix=".json")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(payload + "\n")
+                os.replace(tmp, path)
+            except OSError:
+                os.unlink(tmp)
+                raise
         return True
     except OSError:
         return False

@@ -31,6 +31,18 @@
       "output": 25.0,
       "cacheRead": 0.5,
       "cacheWrite": 6.25
+    },
+    "fable": {
+      "input": 10.0,
+      "output": 50.0,
+      "cacheRead": 1.0,
+      "cacheWrite": 12.5
+    },
+    "mythos": {
+      "input": 10.0,
+      "output": 50.0,
+      "cacheRead": 1.0,
+      "cacheWrite": 12.5
     }
   }
 }

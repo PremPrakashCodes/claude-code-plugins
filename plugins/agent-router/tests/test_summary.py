@@ -60,6 +60,20 @@ class TestUpdate(SummaryCase):
                     summary.update(f"s{i}", routed=1, net_savings_usd=0.0)
         self.assertEqual(sorted(self.read_summary()["sessions"]), ["s3", "s4", "s5"])
 
+    def test_concurrent_updates_keep_every_session(self):
+        import threading
+
+        def worker(i):
+            for _ in range(5):
+                summary.update(f"s{i}", routed=i, net_savings_usd=0.0)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(len(self.read_summary()["sessions"]), 8)
+
     def test_corrupt_file_is_replaced(self):
         path = summary.summary_path()
         path.parent.mkdir(parents=True)
@@ -131,6 +145,16 @@ class TestStopHook(SummaryCase):
         # 1M input tokens: opus $5.00 - haiku $1.00 - two classifier calls $0.008
         self.assertAlmostEqual(entry["net_savings_usd"], 3.992)
         self.assertNotIn("other", json.loads(summary.summary_path().read_text())["sessions"])
+
+    def test_stop_counts_decisions_in_newest_rotated_segment(self):
+        config = config_mod._deep_merge(cfg(), {"log": {"maxBytes": 300, "keepSegments": 3}})
+        log.append(self._decision("s1", "t1"), config)
+        for i in range(3):  # other sessions' traffic pushes s1 into log.1.jsonl
+            log.append(self._decision("other", f"x{i}"), config)
+        with mock.patch.object(cli.config_mod, "load", lambda: config):
+            self.assertEqual(run_stop("s1"), 0)
+        entry = json.loads(summary.summary_path().read_text())["sessions"]["s1"]
+        self.assertEqual(entry["routed"], 1)
 
     def test_stop_without_decisions_writes_nothing(self):
         self.assertEqual(run_stop("s1"), 0)

@@ -34,13 +34,19 @@ DEFAULTS: dict[str, Any] = {
         "haiku": {"input": 1.0, "output": 5.0, "cacheRead": 0.1, "cacheWrite": 1.25},
         "sonnet": {"input": 2.0, "output": 10.0, "cacheRead": 0.2, "cacheWrite": 2.5},
         "opus": {"input": 5.0, "output": 25.0, "cacheRead": 0.5, "cacheWrite": 6.25},
+        "fable": {"input": 10.0, "output": 50.0, "cacheRead": 1.0, "cacheWrite": 12.5},
+        "mythos": {"input": 10.0, "output": 50.0, "cacheRead": 1.0, "cacheWrite": 12.5},
     },
 }
 
 
+def claude_config_dir() -> Path:
+    """Claude Code's config directory: ``$CLAUDE_CONFIG_DIR``, else ``~/.claude``."""
+    return Path(os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude"))
+
+
 def config_path() -> Path:
-    base = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    return Path(base) / "plugins" / "agent-router" / "config.json"
+    return claude_config_dir() / "plugins" / "agent-router" / "config.json"
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
