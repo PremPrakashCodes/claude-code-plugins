@@ -10,11 +10,13 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any
 
 from . import __version__
 from . import config as config_mod
 from . import data as data_mod
+from . import eval as eval_mod
 from . import hooks as hooks_mod
 from . import log as log_mod
 from . import outcomes as outcomes_mod
@@ -31,7 +33,8 @@ Hook subcommands (read the hook JSON payload on stdin):
 
 User subcommands:
   report            summarize the routing log
-  eval              score the classifier against the golden task set
+  eval              score the classifier against the golden task set (live calls)
+                    options: --golden PATH, --floor 0.8, --json
 """
 
 HOOK_COMMANDS = ("route-task", "record-outcome")
@@ -68,6 +71,33 @@ def _run_report(args: list[str]) -> int:
     return 0
 
 
+def _option(args: list[str], name: str) -> str | None:
+    if name in args:
+        index = args.index(name)
+        if index + 1 < len(args):
+            return args[index + 1]
+    return None
+
+
+def _run_eval(args: list[str]) -> int:
+    golden = Path(_option(args, "--golden") or eval_mod.DEFAULT_GOLDEN)
+    floor_arg = _option(args, "--floor")
+    try:
+        floor = float(floor_arg) if floor_arg is not None else eval_mod.DEFAULT_FLOOR
+    except ValueError:
+        print(f"agent-router: --floor must be a number, got {floor_arg!r}", file=sys.stderr)
+        return 2
+    fixtures, warnings = eval_mod.load_golden(golden)
+    for warning in warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    result = eval_mod.run(fixtures, config_mod.load())
+    if "--json" in args:
+        print(json.dumps(result, indent=2))
+    else:
+        print(eval_mod.format_result(result, floor))
+    return 0 if fixtures and result["accuracy"] >= floor else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] in ("-h", "--help", "help"):
@@ -89,6 +119,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "report":
         return _run_report(args[1:])
+    if command == "eval":
+        return _run_eval(args[1:])
     print(f"agent-router: unknown subcommand {command!r}", file=sys.stderr)
     return 2
 
