@@ -37,6 +37,33 @@ Runtime flow:
 7. Compact output is truncated by dropping trailing cells when terminal width is
    known.
 
+## agent-router Runtime
+
+The `agent-router` plugin is a hooks-only Python package with no runtime
+dependencies. `hooks/hooks.json` loads automatically with the plugin and runs
+`src/router.py` with `python3`; nothing is installed.
+
+Routing flow (every Claude subagent dispatch):
+
+1. `PreToolUse` on `Task|Agent` runs `route-task`. It skips dispatches whose
+   model the user chose (dispatch `model`, agent-definition frontmatter, or
+   `CLAUDE_CODE_SUBAGENT_MODEL`).
+2. `agent_router.classifier` runs a minimal `claude -p` call on the classifier
+   model (safe mode, no tools, thinking off) and gets a `low`/`mid`/`high` tier.
+   The nested call carries two recursion guards: `disableAllHooks` and
+   `AGENT_ROUTER_NESTED=1`.
+3. The tier maps to a model alias; the hook returns `updatedInput` (a full copy
+   of the tool input with only `model` changed) unless that would move the
+   dispatch past its baseline model.
+4. `PostToolUse`, `SubagentStop`, and `Stop` run `record-outcome`, which reads
+   the finished subagent transcript for tokens and duration.
+5. Every step appends to `${CLAUDE_PLUGIN_DATA}/log.jsonl` (rotated by rename);
+   `report` prices the outcomes to estimate net savings.
+
+Main-session prompts are never classified: no hook can switch the main model, so
+classification there would only add cost. Every hook failure degrades to "exit
+0, change nothing".
+
 ## Design Principles
 
 - Runtime code uses only Python's standard library.

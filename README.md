@@ -25,6 +25,7 @@ Then install a plugin from the marketplace:
 | Plugin                             | Description                                                                                                                                                          |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [status-line](plugins/status-line) | Configurable status-line HUD for Claude Code: model, project, git, context usage, rate-limit windows, cost, and session details. Pure Python, standard library only. |
+| [agent-router](plugins/agent-router) | Routes Claude's subagent dispatches to the cheapest capable model with a fast AI classifier, and logs each decision with its cost and estimated savings. Pure Python, standard library only. |
 
 The HUD renders a compact, single-line view of your session:
 
@@ -49,6 +50,7 @@ Preview it yourself without installing — see
 |-- .github/                     # Issue templates, PR template, CI
 |-- docs/                        # Architecture and maintainer docs
 |-- plugins/
+|   |-- agent-router/            # Subagent model-routing plugin (hooks)
 |   `-- status-line/             # Self-contained Claude Code plugin
 |       |-- .claude-plugin/      # Plugin manifest
 |       |-- commands/            # Claude slash-command prompts
@@ -112,6 +114,9 @@ ruff check .
 ruff format --check .
 ```
 
+The `make` targets run every plugin under `plugins/`; narrow to one with
+`make test PLUGINS=plugins/status-line`.
+
 Use `make format` or `ruff format .` before opening a pull request.
 
 ## Release And Deployment
@@ -137,6 +142,8 @@ Release checklist:
 
 - [status-line README](plugins/status-line/README.md) - user-facing install,
   configuration, preview, and development guide.
+- [agent-router README](plugins/agent-router/README.md) - how subagent routing
+  works, configuration, the routing report, and platform notes.
 - [Architecture](docs/ARCHITECTURE.md) - project boundaries, runtime flow, and
   extension points.
 - [Contributing](CONTRIBUTING.md) - local workflow, coding standards, and PR
