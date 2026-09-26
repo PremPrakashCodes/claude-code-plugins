@@ -69,8 +69,10 @@ Pick the questions that match what the user wants.
    merged.
 
 2. **Segments & order** - which of `model, project, git, context, usage, cost,
-   session` to show and in what order (the `"segments"` array; order matters,
-   omit a name to hide it).
+   session, router` to show and in what order (the `"segments"` array; order
+   matters, omit a name to hide it). `router` shows this session's savings from
+   the agent-router plugin, e.g. `router: 4↓ $0.38 saved`; it stays hidden until
+   agent-router has routed something in the session.
 
 3. **Progress-bar style** - `"context.barStyle"` (and optionally
    `"usage.barStyle"`). Valid values:

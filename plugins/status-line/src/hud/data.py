@@ -25,6 +25,7 @@ class Window:
 
 @dataclass
 class HudData:
+    session_id: str = ""
     model_display: str = ""
     model_id: str = ""
     cwd: str = ""
@@ -62,6 +63,8 @@ def parse(stdin_json: dict[str, Any]) -> HudData:
     d = stdin_json or {}
     data = HudData()
 
+    session_id = d.get("session_id")
+    data.session_id = session_id if isinstance(session_id, str) else ""
     data.model_display = _get(d, "model", "display_name", default="") or ""
     data.model_id = _get(d, "model", "id", default="") or ""
 

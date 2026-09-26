@@ -24,7 +24,7 @@ DEFAULTS: dict[str, Any] = {
     "theme": "default",
     "pathLevels": 1,  # directory levels shown for the project segment
     # Segment order. Remove an entry to hide it. Known: model, project, git,
-    # context, usage, cost, session.
+    # context, usage, cost, session, router.
     "segments": ["model", "project", "git", "context", "usage"],
     "model": {
         "format": "short",  # "short" -> "Opus 4.8" | "full" -> raw display name
@@ -61,6 +61,11 @@ DEFAULTS: dict[str, Any] = {
     "cost": {
         "label": "$",
     },
+    # Savings from the agent-router plugin for this session; hidden when
+    # agent-router is not installed or has routed nothing yet.
+    "router": {
+        "label": "router",
+    },
     "session": {
         "showDuration": False,
         "showLines": False,  # +added/-removed
@@ -91,6 +96,7 @@ _BASE_ROLES: dict[str, Any] = {
     "contextWarn": "yellow",
     "contextCrit": "red",
     "cost": "green",
+    "router": "green",
     "session": "dim",
     "linesAdded": "green",
     "linesRemoved": "red",
