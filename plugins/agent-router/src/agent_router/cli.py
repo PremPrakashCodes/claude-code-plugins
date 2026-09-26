@@ -17,6 +17,8 @@ from . import config as config_mod
 from . import data as data_mod
 from . import hooks as hooks_mod
 from . import log as log_mod
+from . import outcomes as outcomes_mod
+from . import report as report_mod
 from .classifier import NESTED_ENV
 
 USAGE = f"""agent-router {__version__}
@@ -50,6 +52,22 @@ def _run_hook(command: str) -> None:
         sys.stdout.write(json.dumps(reply) + "\n")
 
 
+def _run_report(args: list[str]) -> int:
+    config = config_mod.load()
+    records = list(log_mod.read_records())
+    # Outcomes a Stop hook has not resolved yet (e.g. the session is still open).
+    for outcome in outcomes_mod.resolve_pending(records):
+        log_mod.append(outcome, config)
+        records.append(outcome)
+    summary = report_mod.summarize(records, config)
+    if "--json" in args:
+        print(json.dumps(summary, indent=2))
+    else:
+        print(report_mod.format_summary(summary, config))
+        print(f"\nLog: {log_mod.log_path()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] in ("-h", "--help", "help"):
@@ -69,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
             # A hook must never break the host; routing degrades to "no change".
             pass
         return 0
+    if command == "report":
+        return _run_report(args[1:])
     print(f"agent-router: unknown subcommand {command!r}", file=sys.stderr)
     return 2
 
