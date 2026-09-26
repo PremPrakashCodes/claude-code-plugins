@@ -24,10 +24,6 @@ _FAMILY_RANK = {"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3, "mythos": 3}
 # an explicit choice the router must respect (R6).
 SUBAGENT_MODEL_ENV = "CLAUDE_CODE_SUBAGENT_MODEL"
 
-# Built-in subagent types that run on a cheaper model than the session by
-# default. Their default is the baseline the router never upgrades past.
-BUILTIN_AGENT_MODELS = {"Explore": "haiku"}
-
 
 def _fingerprint(event: data_mod.DispatchEvent) -> str:
     digest = hashlib.sha256(f"{event.description}\n{event.prompt}".encode()).hexdigest()
@@ -112,9 +108,9 @@ def route_task(
         return None, [record]
 
     transcript = payload.get("transcript_path") if isinstance(payload, dict) else None
-    baseline = BUILTIN_AGENT_MODELS.get(event.subagent_type) or session_model(
-        transcript if isinstance(transcript, str) else ""
-    )
+    # Subagents without a pinned model (built-ins such as Explore included)
+    # inherit the session model, so that is the baseline never to upgrade past.
+    baseline = session_model(transcript if isinstance(transcript, str) else "")
     fields["baseline_model"] = baseline
     target_family = data_mod.model_family(target)
     baseline_family = data_mod.model_family(baseline)

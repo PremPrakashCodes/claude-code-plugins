@@ -165,16 +165,16 @@ class TestRouteTask(EnvCase):
         self.assertIsNone(reply)
         self.assertEqual(records[0]["reason"], "same_model")
 
-    def test_builtin_explore_is_never_upgraded(self):
+    def test_explore_inherits_session_model_baseline(self):
+        # Verified live: built-in Explore runs on the session model by default
         reply, records = hooks.route_task(
             dispatch_payload(subagent_type="Explore"),
             cfg(),
             classify=classify_as("mid"),
             session_model=session("claude-opus-5"),
         )
-        self.assertIsNone(reply)
-        self.assertEqual(records[0]["reason"], "no_upgrade")
-        self.assertEqual(records[0]["baseline_model"], "haiku")
+        self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "sonnet")
+        self.assertEqual(records[0]["baseline_model"], "claude-opus-5")
 
     def test_unknown_session_model_still_routes(self):
         reply, _ = hooks.route_task(
