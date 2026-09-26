@@ -1,19 +1,32 @@
 .PHONY: test lint format format-check check clean
 
-PLUGIN_DIR := plugins/status-line
+# Every plugin with a pyproject.toml. Narrow to one with `make test PLUGINS=plugins/status-line`.
+PLUGINS ?= $(patsubst %/pyproject.toml,%,$(wildcard plugins/*/pyproject.toml))
 PYTHON ?= python3
 
 test:
-	cd $(PLUGIN_DIR) && $(PYTHON) -m unittest discover -s tests
+	@set -e; for dir in $(PLUGINS); do \
+		echo "==> $$dir: tests"; \
+		(cd $$dir && $(PYTHON) -m unittest discover -s tests); \
+	done
 
 lint:
-	cd $(PLUGIN_DIR) && ruff check .
+	@set -e; for dir in $(PLUGINS); do \
+		echo "==> $$dir: ruff check"; \
+		(cd $$dir && ruff check .); \
+	done
 
 format:
-	cd $(PLUGIN_DIR) && ruff format .
+	@set -e; for dir in $(PLUGINS); do \
+		echo "==> $$dir: ruff format"; \
+		(cd $$dir && ruff format .); \
+	done
 
 format-check:
-	cd $(PLUGIN_DIR) && ruff format --check .
+	@set -e; for dir in $(PLUGINS); do \
+		echo "==> $$dir: ruff format --check"; \
+		(cd $$dir && ruff format --check .); \
+	done
 
 check: test lint format-check
 

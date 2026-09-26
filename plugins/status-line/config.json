@@ -46,6 +46,10 @@
     "label": "$"
   },
 
+  "router": {
+    "label": "router"
+  },
+
   "session": {
     "showDuration": false,
     "showLines": false

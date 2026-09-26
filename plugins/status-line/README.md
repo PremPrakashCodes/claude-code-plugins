@@ -40,6 +40,8 @@ Requires Python 3.8+ **or** [uv](https://docs.astral.sh/uv/) on your PATH.
 - Context window usage with selectable progress-bar styles.
 - 5-hour and 7-day rate-limit windows with reset countdowns.
 - Optional cost, duration, and line-change session details.
+- Optional `router` segment showing this session's savings from the
+  [agent-router](../agent-router) plugin.
 - Compact one-line layout or expanded multi-line layout.
 - Themes, custom colors, custom labels, and partial config overrides.
 - Fail-silent runtime behavior so prompt rendering is never interrupted by a
@@ -71,7 +73,7 @@ Top-level options:
 | `separator`       | string                                          | Text between compact segments. Default: space, pipe, space.                                                                 |
 | `theme`           | `default`, `nord`, `dracula`, `gruvbox`, `mono` | Base color theme.                                                                                                           |
 | `pathLevels`      | number                                          | Directory levels shown in the project segment.                                                                              |
-| `segments`        | array                                           | Segment order. Known segments: `model`, `project`, `git`, `context`, `usage`, `cost`, `session`. Omit a segment to hide it. |
+| `segments`        | array                                           | Segment order. Known segments: `model`, `project`, `git`, `context`, `usage`, `cost`, `session`, `router`. Omit a segment to hide it. |
 | `colors`          | object                                          | Per-role color overrides applied on top of the active theme.                                                                |
 | `customBarFilled` | string or `null`                                | Overrides the filled glyph for standard bar styles.                                                                         |
 | `customBarEmpty`  | string or `null`                                | Overrides the empty glyph for standard bar styles.                                                                          |
@@ -125,6 +127,7 @@ Cost and session options:
 | Key                    | Values / type | What it controls                                |
 | ---------------------- | ------------- | ----------------------------------------------- |
 | `cost.label`           | string        | Prefix for the cost segment. Default: `$`.      |
+| `router.label`         | string        | Prefix for the router segment. Default: `router`. |
 | `session.showDuration` | boolean       | Shows session duration when available.          |
 | `session.showLines`    | boolean       | Shows added/removed line counts when available. |
 

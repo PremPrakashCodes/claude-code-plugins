@@ -11,6 +11,16 @@ and plugin versions should follow [Semantic Versioning](https://semver.org/).
 
 - Open-source project documentation, contribution guidance, community standards,
   templates, and development quality checks.
+- `agent-router` plugin: AI-classified model routing for Claude's subagent
+  dispatches. Rewrites each dispatch's model to the cheapest capable tier and
+  logs every routing decision and its cost locally.
+- `agent-router` routing quality: the classifier runs with a classifier-only
+  system prompt (~85% cheaper per call), unsure answers route one tier up,
+  subagent types that keep showing quality issues escalate automatically, the
+  report breaks results down by subagent type, and an opt-in capture mode builds
+  an eval set from real dispatches.
+- `status-line` `router` segment: shows the current session's routed dispatches
+  and estimated net savings from `agent-router` (opt-in via `segments`).
 
 ## [0.1.0] - 2026-05-31
 

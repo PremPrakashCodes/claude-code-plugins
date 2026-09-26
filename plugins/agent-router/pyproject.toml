@@ -1,0 +1,67 @@
+[project]
+name = "agent-router"
+version = "0.1.0"
+description = "Model-routing layer for Claude Code (pure Python, stdlib only)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Prem Prakash Sharma" },
+]
+keywords = ["claude-code", "plugin", "model-routing", "hooks", "cost"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+# Exposes an `agent-router` command once installed. The runtime needs only the
+# standard library; hooks can also run src/router.py directly with any
+# Python 3.8+ - no install required.
+[project.scripts]
+agent-router = "agent_router.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/PremPrakashCodes/claude-code-plugins"
+Issues = "https://github.com/PremPrakashCodes/claude-code-plugins/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_router"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+  # Same rationale as status-line: annotations are stringized via
+  # `from __future__ import annotations`, so Optional[X] and `X | None` are
+  # both safe on the Python 3.8 floor.
+  "UP007",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
