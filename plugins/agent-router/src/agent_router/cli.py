@@ -7,9 +7,17 @@ fail the host: any error degrades to "exit 0, print nothing".
 
 from __future__ import annotations
 
+import json
+import os
 import sys
+from typing import Any
 
 from . import __version__
+from . import config as config_mod
+from . import data as data_mod
+from . import hooks as hooks_mod
+from . import log as log_mod
+from .classifier import NESTED_ENV
 
 USAGE = f"""agent-router {__version__}
 
@@ -24,6 +32,23 @@ User subcommands:
   eval              score the classifier against the golden task set
 """
 
+HOOK_COMMANDS = ("route-task", "record-outcome")
+
+
+def _run_hook(command: str) -> None:
+    payload = data_mod.read_payload()
+    config = config_mod.load()
+    records: list[dict[str, Any]] = []
+    reply = None
+    if command == "route-task":
+        reply, records = hooks_mod.route_task(payload, config)
+    elif command == "record-outcome":
+        records = hooks_mod.record_outcome(payload, lambda: list(log_mod.read_records()))
+    for record in records:
+        log_mod.append(record, config)
+    if reply is not None:
+        sys.stdout.write(json.dumps(reply) + "\n")
+
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
@@ -33,7 +58,18 @@ def main(argv: list[str] | None = None) -> int:
     if args[0] in ("-V", "--version"):
         print(__version__)
         return 0
-    print(f"agent-router: unknown subcommand {args[0]!r}", file=sys.stderr)
+    command = args[0]
+    if command in HOOK_COMMANDS:
+        # Inside the classifier's own nested session: never re-enter the router.
+        if os.environ.get(NESTED_ENV):
+            return 0
+        try:
+            _run_hook(command)
+        except Exception:
+            # A hook must never break the host; routing degrades to "no change".
+            pass
+        return 0
+    print(f"agent-router: unknown subcommand {command!r}", file=sys.stderr)
     return 2
 
 
