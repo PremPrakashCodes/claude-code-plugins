@@ -12,10 +12,12 @@ import os
 import time
 from typing import Any, Callable
 
+from . import adaptive as adaptive_mod
 from . import classifier as classifier_mod
 from . import data as data_mod
 from . import outcomes as outcomes_mod
 from . import report as report_mod
+from . import tiers as tiers_mod
 from .config import tier_model
 
 # Claude Code's setting for a default subagent model; a user-chosen default is
@@ -28,6 +30,26 @@ def _fingerprint(event: data_mod.DispatchEvent) -> str:
     return digest[:16]
 
 
+def _task_key(event: data_mod.DispatchEvent) -> str:
+    """Hash of the normalized description: spots a re-dispatch of the same task."""
+    normalized = " ".join(event.description.lower().split())
+    return hashlib.sha256(normalized.encode()).hexdigest()[:16] if normalized else ""
+
+
+def _capture(event: data_mod.DispatchEvent, **fields: Any) -> dict[str, Any]:
+    """Opt-in record of the real task text, kept out of the routing log."""
+    record = {
+        "kind": "capture",
+        "ts": time.time(),
+        "session_id": event.session_id,
+        "subagent_type": event.subagent_type,
+        "description": event.description,
+        "prompt": event.prompt[: classifier_mod.PROMPT_EXCERPT_CHARS],
+    }
+    record.update(fields)
+    return record
+
+
 def _decision(event: data_mod.DispatchEvent, **fields: Any) -> dict[str, Any]:
     record = {
         "kind": "decision",
@@ -37,6 +59,7 @@ def _decision(event: data_mod.DispatchEvent, **fields: Any) -> dict[str, Any]:
         "tool_use_id": event.tool_use_id,
         "subagent_type": event.subagent_type,
         "fingerprint": _fingerprint(event),
+        "task_key": _task_key(event),
         "signals": {
             "description_chars": len(event.description),
             "prompt_chars": len(event.prompt),
@@ -59,8 +82,34 @@ def route_task(
     config: dict[str, Any],
     classify: Callable[..., classifier_mod.ClassifierResult] = classifier_mod.classify,
     session_model: Callable[[str], str | None] = data_mod.session_model_from_transcript,
+    adaptive_stats: Callable[[], dict[str, Any]] = adaptive_mod.load,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    """PreToolUse on Task/Agent: classify the dispatch and rewrite its model."""
+    """PreToolUse on Task/Agent: classify the dispatch and rewrite its model.
+
+    Records of kind ``capture`` (opt-in) belong in the capture file, not the log.
+    """
+    reply, records = _route(payload, config, classify, session_model, adaptive_stats)
+    if records and (config.get("capture") or {}).get("enabled") is True:
+        event = data_mod.parse_dispatch(payload)
+        decision = records[0]
+        records.append(
+            _capture(
+                event,
+                classifier_tier=decision.get("classifier_tier"),
+                routed_tier=decision.get("tier"),
+                confidence=decision.get("confidence"),
+            )
+        )
+    return reply, records
+
+
+def _route(
+    payload: dict[str, Any],
+    config: dict[str, Any],
+    classify: Callable[..., classifier_mod.ClassifierResult],
+    session_model: Callable[[str], str | None],
+    adaptive_stats: Callable[[], dict[str, Any]],
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     event = data_mod.parse_dispatch(payload)
     if not event.is_dispatch:
         return None, []
@@ -93,10 +142,15 @@ def route_task(
         )
         return None, [record]
 
-    target = tier_model(config, result.tier)
+    tier, adjustments = tiers_mod.route_tier(
+        result.tier, result.confidence, event.subagent_type, config, adaptive_stats()
+    )
+    target = tier_model(config, tier)
     fields: dict[str, Any] = {
         "source": "LLM",
-        "tier": result.tier,
+        "tier": tier,
+        "classifier_tier": result.tier,
+        "adjustments": adjustments,
         "confidence": result.confidence,
         "classifier": _classifier_fields(result),
     }

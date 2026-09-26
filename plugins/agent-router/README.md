@@ -28,10 +28,18 @@ else to install; the hooks run the plugin's `src/router.py` directly.
 1. Claude dispatches a subagent (the `Agent`/`Task` tool).
 2. The `PreToolUse` hook sends the dispatch's type, description, and the first
    4,000 characters of its prompt to a classifier (Haiku by default). It answers
-   `low`, `mid`, or `high` in about 2-4 seconds for about $0.004.
-3. The tier maps to a model (`haiku` / `sonnet` / `opus` by default) and the
+   `low`, `mid`, or `high` with a confidence, in about 2-3 seconds for about
+   $0.0007. The classifier runs with its own short system prompt instead of
+   Claude Code's, which is what keeps it this cheap.
+3. The answer can move **up** one tier, never down:
+   - **low confidence** - the confidence is missing or below
+     `classifier.minConfidence` (0.7), so the router picks the next tier up;
+   - **adaptive** - past routed dispatches of this subagent type at this tier
+     showed too many quality issues (see below).
+4. The tier maps to a model (`haiku` / `sonnet` / `opus` by default) and the
    dispatch is rewritten to that model.
-4. When the subagent finishes, its token usage and duration are logged.
+5. When the subagent finishes, its token usage, duration, and a quality signal
+   are logged.
 
 The router leaves a dispatch unchanged when:
 
@@ -47,6 +55,33 @@ The router leaves a dispatch unchanged when:
 Main-session prompts are never classified. No hook can switch the main-session
 model, so an advisory would only add the classifier's cost on top of the model
 that answers anyway.
+
+### Quality signals and adaptive routing
+
+A routed dispatch has a **quality issue** when its subagent returned a
+near-empty result (under `adaptive.shortResultChars` characters), or when the
+same task - same subagent type and description - was dispatched again in the
+same session within `adaptive.redispatchWindowSeconds`. Both suggest the
+cheaper model was not enough.
+
+After each turn in which subagents finished, the router counts outcomes and
+issues per subagent type and tier into a small `adaptive.json`. Once a
+type/tier has at least `adaptive.minSamples` (5) outcomes and an issue rate of
+`adaptive.maxIssueRate` (40%) or more, later dispatches of that type at that
+tier route one tier up. It only ever escalates, so the worst case is a smaller
+saving. `/agent-router:report` shows the counts per subagent type.
+
+### Build an eval set from your own tasks
+
+Set `capture.enabled` to `true` and the router saves each dispatch's
+description and prompt excerpt to `captures.jsonl` in its data directory (never
+into the routing log). Then:
+
+```bash
+python3 src/router.py export-captures --out my-golden.jsonl
+# review and correct each expected_tier (pre-filled with the router's pick)
+python3 src/router.py eval --golden my-golden.jsonl
+```
 
 ### Flow
 
@@ -75,14 +110,17 @@ that answers anyway.
  │                        │ thinking off, hooks disabled,             │ │
  │                        │ AGENT_ROUTER_NESTED=1                     │ │
  │                        │ input: type + description + 4k of prompt  │ │
- │                        │ output: {"tier":"low|mid|high"}           │ │
- │                        │ ~2-4 s, ~$0.004                           │ │
+ │                        │ output: {"tier":..,"confidence":..}       │ │
+ │                        │ ~2-3 s, ~$0.0007                          │ │
  │                        └───────────────────────────────────────────┘ │
  │                        │ fail/timeout (6 s)  ──────────────────────► KEEP
  │                        ▼                                   (fallback)│
- │  3. tier ─► model:   low ─► haiku   mid ─► sonnet   high ─► opus     │
+ │  3. one tier up if confidence < 0.7, or if this subagent type        │
+ │     keeps showing quality issues at this tier (adaptive)             │
  │                        │                                             │
- │  4. Compare with the model it would otherwise use (the session       │
+ │  4. tier ─► model:   low ─► haiku   mid ─► sonnet   high ─► opus     │
+ │                        │                                             │
+ │  5. Compare with the model it would otherwise use (the session       │
  │     model, read from the transcript):                                │
  │     • either model family unknown  ──────────────────────────────►  KEEP
  │     • pick is pricier than the session model  ───────────────────►  KEEP
@@ -100,8 +138,10 @@ that answers anyway.
  ┌──────────────────────── OUTCOME CAPTURE ─────────────────────────────┐
  │  PostToolUse     ─► "link"          tool_use_id ↔ agentId, model     │
  │  SubagentStop    ─► "subagent_stop" path to the subagent transcript  │
- │  Stop (turn end) ─► read transcript ─► "outcome": tokens, duration   │
+ │  Stop (turn end) ─► read transcript ─► "outcome": tokens, duration,  │
+ │                     result length (quality signal)                   │
  │                  ─► session totals ─► summary.json (locked, atomic)  │
+ │                  ─► per type/tier issue rates ─► adaptive.json       │
  └──────────────────────────────────────────────────────────────────────┘
                      │                                 │
                      ▼                                 ▼
@@ -113,6 +153,8 @@ that answers anyway.
    /agent-router:report                      status-line `router` segment
    ─────────────────────                     ──────────────────────────────
    decisions: LLM / override / fallback      [Opus 5] | ctx 9% | router: 4↓ $0.38 saved
+   tier-up adjustments, quality issues
+   per-subagent-type breakdown
    classifier cost + avg latency
    net savings (estimate) =
      cost on the session model
@@ -130,7 +172,7 @@ keep the classifier's own `claude -p` session from re-entering the router.
 |---------|--------------|
 | `/agent-router:setup` | Preflight: checks `python3`, the router CLI, and the `claude` CLI; shows the hooks, config, and log paths |
 | `/agent-router:configure` | Change tier models, turn the classifier off or change its model and timeout, log retention, or the price table |
-| `/agent-router:report` | Routed dispatches, classifier cost, and estimated net savings |
+| `/agent-router:report` | Routed dispatches, classifier cost, estimated net savings, quality issues, and a per-subagent-type breakdown |
 
 ## Savings in the status line
 
@@ -162,15 +204,24 @@ over the defaults in [`config.json`](config.json):
 | `classifier.enabled` | `true` | `false` pauses all routing |
 | `classifier.model` | `"haiku"` | Model that classifies dispatches |
 | `classifier.timeoutSeconds` | `6` | On timeout the dispatch keeps its model |
+| `classifier.minConfidence` | `0.7` | Below this (or with no confidence), route one tier up |
+| `adaptive.enabled` | `true` | Escalate a subagent type/tier that keeps showing quality issues |
+| `adaptive.minSamples` | `5` | Outcomes needed before a type/tier can escalate |
+| `adaptive.maxIssueRate` | `0.4` | Issue rate at which a type/tier escalates |
+| `adaptive.shortResultChars` | `20` | A subagent result shorter than this counts as an issue |
+| `adaptive.redispatchWindowSeconds` | `900` | Re-dispatching the same task within this window counts as an issue |
+| `capture.enabled` | `false` | Save real dispatch text locally for `export-captures` |
 | `log.maxBytes` | `5000000` | Size at which `log.jsonl` rotates |
 | `log.keepSegments` | `3` | Rotated log files kept |
-| `pricing` | Haiku, Sonnet, and Opus list prices | USD per million tokens, used only by `report` |
+| `pricing` | Haiku, Sonnet, Opus, Fable, and Mythos list prices | USD per million tokens, used only by `report` |
 
 ## Privacy
 
 The routing log stays on your machine under `${CLAUDE_PLUGIN_DATA}`. It records
-a hash of each dispatch, its type, sizes, the chosen tier and model, and token
-counts - never the prompt text. The classifier call sends the dispatch's
+a hash of each dispatch, its type, sizes, the chosen tier and model, token
+counts, and the length of the subagent's result - never the prompt or result
+text. Only the opt-in `capture.enabled` mode saves dispatch text, to a separate
+`captures.jsonl`. The classifier call sends the dispatch's
 description and prompt excerpt to Anthropic through your own `claude` CLI login,
 the same as any other Claude Code request.
 
@@ -202,6 +253,7 @@ against Claude Code 2.1.283 with a throwaway probe plugin (2026-09-27):
 | Built-in `Explore` subagent runs on a cheaper default model | **No** - it inherits the session model |
 | Nested `claude -p` classifier starts inside a hook (`CLAUDECODE=1`) | Confirmed |
 | Minimal classifier call (`--safe-mode --tools ""`, thinking off, Haiku) | 2-4 s, ~4k input and ~20 output tokens, ~$0.004 per call |
+| Same call with a classifier-only `--system-prompt` | ~2.3 s, ~600 input and ~17 output tokens, ~$0.0007 per call; golden-set accuracy rose from 85.7% to 100% (21/21, two runs) |
 | `updatedInput` applies without a `permissionDecision` | Confirmed: the router never auto-approves a dispatch |
 
 The subagent tool is named `Agent` in current Claude Code; hooks match

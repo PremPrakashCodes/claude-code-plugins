@@ -41,14 +41,26 @@ The authoritative option list and defaults live in
      their model and nothing is classified.
    - `model` (default `"haiku"`): the model that classifies each dispatch.
      A pricier model costs more per dispatch and can cancel out the savings.
-   - `timeoutSeconds` (default `6`): calls take ~2-4 s; on timeout the dispatch
+   - `timeoutSeconds` (default `6`): calls take ~2-3 s; on timeout the dispatch
      keeps its model. Every dispatch waits for the classifier, so keep this low.
+   - `minConfidence` (default `0.7`): an answer below this, or with no
+     confidence, routes one tier up. Raise it to route more conservatively.
 
-3. **Log retention** - `"log"`: `maxBytes` (default 5 MB) is the size at which
+3. **Adaptive routing** - `"adaptive"`: `enabled` (default `true`) escalates a
+   subagent type/tier whose routed dispatches keep showing quality issues;
+   `minSamples` (5) and `maxIssueRate` (0.4) set when; `shortResultChars` (20)
+   and `redispatchWindowSeconds` (900) define an issue. It only ever routes up.
+
+4. **Capture for evals** - `"capture": {"enabled": true}` saves each
+   dispatch's description and prompt excerpt locally so the user can export a
+   personal eval set (`python3 "$CLAUDE_PLUGIN_ROOT/src/router.py"
+   export-captures`). Off by default; mention that it stores task text.
+
+5. **Log retention** - `"log"`: `maxBytes` (default 5 MB) is the size at which
    `log.jsonl` rotates; `keepSegments` (default 3) is how many rotated files are
    kept. The log stays on this machine.
 
-4. **Price table** - `"pricing"`: USD per million tokens per model family
+6. **Price table** - `"pricing"`: USD per million tokens per model family
    (`input`, `output`, `cacheRead`, `cacheWrite`), used only by
    `/agent-router:report` to estimate savings. Update it to match the user's
    plan or the current price list.

@@ -88,6 +88,19 @@ class TestRun(unittest.TestCase):
         self.assertEqual(result["confusion"]["high"], {"mid": 1})
         self.assertEqual(result["confusion"]["low"], {"low": 1})
 
+    def test_low_confidence_answers_are_scored_after_adjustment(self):
+        def fake(subagent_type, description, prompt, config):
+            return ClassifierResult(ok=True, tier="low", confidence=0.3)
+
+        result = eval_mod.run([fixture("a", "mid", "x")], cfg(), classify=fake)
+        self.assertEqual(result["accuracy"], 1.0)  # routed low -> mid
+        self.assertEqual(result["classifier_accuracy"], 0.0)
+        self.assertEqual(result["under_routed"], 0)
+
+    def test_under_routing_is_counted(self):
+        result = eval_mod.run([fixture("a", "high", "x")], cfg(), classify=answers({"x": "low"}))
+        self.assertEqual(result["under_routed"], 1)
+
     def test_classifier_failure_is_a_miss(self):
         result = eval_mod.run([fixture("a", "low", "x")], cfg(), classify=answers({}))
         self.assertEqual(result["accuracy"], 0.0)

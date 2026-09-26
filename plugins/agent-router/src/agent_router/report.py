@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
+from .adaptive import quality_issues
 from .data import model_family
 
 _PRICE_FIELDS = (
@@ -40,7 +41,20 @@ def _bump(counts: dict[str, int], key: Any) -> None:
     counts[label] = counts.get(label, 0) + 1
 
 
+def _type_row() -> dict[str, Any]:
+    return {
+        "decisions": 0,
+        "rewrites": 0,
+        "fallbacks": 0,
+        "outcomes": 0,
+        "quality_issues": 0,
+        "net_savings_usd": 0.0,
+    }
+
+
 def summarize(records: Iterable[dict[str, Any]], config: dict[str, Any]) -> dict[str, Any]:
+    records = list(records)
+    issues = quality_issues(records, config)
     decisions: list[dict[str, Any]] = []
     outcomes: dict[str, dict[str, Any]] = {}
     for record in records:
@@ -57,32 +71,48 @@ def summarize(records: Iterable[dict[str, Any]], config: dict[str, Any]) -> dict
     classifier_cost = 0.0
     classifier_calls = 0
     classifier_ms = 0
+    adjustments: dict[str, int] = {}
+    issue_kinds: dict[str, int] = {}
+    by_type: dict[str, dict[str, Any]] = {}
     actual = baseline = 0.0
     with_outcome = without_baseline = rewrites = 0
 
     for record in decisions:
         source = record.get("source")
         _bump(by_source, source)
+        row = by_type.setdefault(record.get("subagent_type") or "unknown", _type_row())
+        row["decisions"] += 1
+        for adjustment in record.get("adjustments") or []:
+            _bump(adjustments, adjustment)
         classifier = record.get("classifier")
         if isinstance(classifier, dict):
             classifier_calls += 1
             cost = classifier.get("cost_usd")
             if isinstance(cost, (int, float)):
                 classifier_cost += cost
+                row["net_savings_usd"] -= cost
             duration = classifier.get("duration_ms")
             if isinstance(duration, (int, float)):
                 classifier_ms += duration
         if source == "fallback":
+            row["fallbacks"] += 1
             _bump(fallback_reasons, record.get("reason"))
         if record.get("action") != "rewrite":
             if source == "LLM":
                 _bump(kept_reasons, record.get("reason"))
             continue
         rewrites += 1
+        row["rewrites"] += 1
         _bump(rewrites_by_model, record.get("model"))
         result = outcomes.get(record.get("tool_use_id") or "")
         if not result:
             continue
+        row["outcomes"] += 1
+        found = issues.get(record.get("tool_use_id") or "") or []
+        if found:
+            row["quality_issues"] += 1
+            for kind in found:
+                _bump(issue_kinds, kind)
         usage = result.get("usage") or {}
         spent = usage_cost(usage, result.get("model") or record.get("model"), config)
         would_have = usage_cost(usage, record.get("baseline_model"), config)
@@ -92,6 +122,10 @@ def summarize(records: Iterable[dict[str, Any]], config: dict[str, Any]) -> dict
         with_outcome += 1
         actual += spent
         baseline += would_have
+        row["net_savings_usd"] += would_have - spent
+
+    for row in by_type.values():
+        row["net_savings_usd"] = round(row["net_savings_usd"], 6)
 
     return {
         "decisions": len(decisions),
@@ -100,6 +134,9 @@ def summarize(records: Iterable[dict[str, Any]], config: dict[str, Any]) -> dict
         "rewrites_by_model": rewrites_by_model,
         "kept_reasons": kept_reasons,
         "fallback_reasons": fallback_reasons,
+        "adjustments": adjustments,
+        "quality_issue_kinds": issue_kinds,
+        "by_subagent_type": by_type,
         "classifier_calls": classifier_calls,
         "classifier_cost_usd": round(classifier_cost, 6),
         "classifier_avg_ms": int(classifier_ms / classifier_calls) if classifier_calls else 0,
@@ -126,6 +163,8 @@ def format_summary(summary: dict[str, Any], config: dict[str, Any]) -> str:
         f"Rewritten dispatches: {summary['rewrites']}  ({_counts(summary['rewrites_by_model'])})",
         f"Kept after classifying: {_counts(summary['kept_reasons'])}",
         f"Classifier failures: {_counts(summary['fallback_reasons'])}",
+        f"Routed one tier up:  {_counts(summary['adjustments'])}",
+        f"Quality issues:      {_counts(summary['quality_issue_kinds'])}",
         "",
         f"Classifier calls:    {summary['classifier_calls']}  "
         f"(${summary['classifier_cost_usd']:.4f} total, "
@@ -138,6 +177,19 @@ def format_summary(summary: dict[str, Any], config: dict[str, Any]) -> str:
         f"Savings are an estimate from the config price table ({priced}); "
         "edit `pricing` to match your plan.",
     ]
+    if summary["by_subagent_type"]:
+        lines += ["", "By subagent type:"]
+        lines.append(
+            f"  {'type':<24} {'decisions':>9} {'rewrites':>8} {'fallback':>8} "
+            f"{'issues':>10} {'net saved':>10}"
+        )
+        ordered = sorted(summary["by_subagent_type"].items(), key=lambda kv: -kv[1]["decisions"])
+        for name, row in ordered:
+            issues = f"{row['quality_issues']}/{row['outcomes']}"
+            lines.append(
+                f"  {name[:24]:<24} {row['decisions']:>9} {row['rewrites']:>8} "
+                f"{row['fallbacks']:>8} {issues:>10} ${row['net_savings_usd']:>9.4f}"
+            )
     if summary["rewrites_without_baseline"]:
         lines.append(
             f"{summary['rewrites_without_baseline']} routed dispatch(es) had no known "

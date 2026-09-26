@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from . import adaptive as adaptive_mod
 from . import config as config_mod
 from . import data as data_mod
 from . import eval as eval_mod
@@ -33,7 +34,9 @@ Hook subcommands (read the hook JSON payload on stdin):
   record-outcome    PostToolUse / SubagentStop / Stop: log tokens and duration
 
 User subcommands:
-  report            summarize the routing log
+  report            summarize the routing log (add --json for machine output)
+  export-captures   write captured dispatches as an eval set (needs capture.enabled)
+                    options: --out PATH (default: evals/captured.jsonl in the data dir)
   eval              score the classifier against the golden task set (live calls)
                     options: --golden PATH, --floor 0.8, --json
 """
@@ -56,6 +59,14 @@ def _finish_turn(payload: dict[str, Any], config: dict[str, Any]) -> None:
         log_mod.append(record, config)
     if totals is not None:
         summary_mod.update(session_id, routed=totals[0], net_savings_usd=totals[1])
+    if new_outcomes:
+        # Adaptive counts change only when outcomes arrive, so the full-history
+        # read happens after subagents finish, not on every turn.
+        adaptive_mod.save(adaptive_mod.compute(list(log_mod.read_records()), config))
+
+
+def capture_path():
+    return log_mod.data_dir() / "captures.jsonl"
 
 
 def _run_hook(command: str) -> None:
@@ -71,7 +82,10 @@ def _run_hook(command: str) -> None:
             return
         records = hooks_mod.record_outcome(payload)
     for record in records:
-        log_mod.append(record, config)
+        if record.get("kind") == "capture":
+            log_mod.append(record, config, path=capture_path())
+        else:
+            log_mod.append(record, config)
     if reply is not None:
         sys.stdout.write(json.dumps(reply) + "\n")
 
@@ -89,6 +103,28 @@ def _run_report(args: list[str]) -> int:
     else:
         print(report_mod.format_summary(summary, config))
         print(f"\nLog: {log_mod.log_path()}")
+    return 0
+
+
+def _run_export_captures(args: list[str]) -> int:
+    source = capture_path()
+    captures = list(log_mod.read_records(source))
+    if not captures:
+        print(
+            f"No captured dispatches at {source}. Set capture.enabled to true with "
+            "/agent-router:configure, work for a while, then re-run.",
+            file=sys.stderr,
+        )
+        return 1
+    out = Path(_option(args, "--out") or (log_mod.data_dir() / "evals" / "captured.jsonl"))
+    lines = [eval_mod.golden_line(index, record) for index, record in enumerate(captures)]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(json.dumps(line) for line in lines) + "\n", encoding="utf-8")
+    print(f"Wrote {len(lines)} fixtures to {out}")
+    print(
+        "expected_tier is pre-filled with the tier the router picked. Review and correct "
+        f"each label, then run: agent-router eval --golden {out}"
+    )
     return 0
 
 
@@ -142,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_report(args[1:])
     if command == "eval":
         return _run_eval(args[1:])
+    if command == "export-captures":
+        return _run_export_captures(args[1:])
     print(f"agent-router: unknown subcommand {command!r}", file=sys.stderr)
     return 2
 

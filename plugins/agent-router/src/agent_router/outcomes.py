@@ -111,6 +111,7 @@ def stop_record(payload: dict[str, Any]) -> dict[str, Any] | None:
     transcript = payload.get("agent_transcript_path")
     if not isinstance(agent_id, str) or not agent_id or not isinstance(transcript, str):
         return None
+    message = payload.get("last_assistant_message")
     return {
         "kind": "subagent_stop",
         "ts": time.time(),
@@ -118,6 +119,9 @@ def stop_record(payload: dict[str, Any]) -> dict[str, Any] | None:
         "agent_id": agent_id,
         "agent_type": payload.get("agent_type") or "",
         "transcript": transcript,
+        # Length only - the text itself is never logged. A near-empty result
+        # is one of the quality signals adaptive routing counts.
+        "result_chars": len(message) if isinstance(message, str) else None,
     }
 
 
@@ -165,6 +169,7 @@ def resolve_pending(
                 "usage": summary["usage"],
                 "duration_ms": summary["duration_ms"],
                 "messages": summary["messages"],
+                "result_chars": stop.get("result_chars"),
             }
         )
     return outcomes

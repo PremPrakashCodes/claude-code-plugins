@@ -2,8 +2,9 @@
 
 Runs a minimal headless ``claude -p`` call on a fast model. The nested session is
 started with ``--safe-mode`` (no plugins, hooks, MCP servers, or CLAUDE.md), no
-tools, no session persistence, and thinking off, so each call stays small
-(~4k input tokens, ~20 output tokens, 2-4 s in practice). Two independent
+tools, no session persistence, thinking off, and a classifier-only system
+prompt, so each call stays small (~600 input tokens, ~20 output tokens, ~2-3 s,
+~$0.0007 in practice). Two independent
 recursion guards keep the nested session from re-entering the router:
 ``disableAllHooks`` in its settings and ``AGENT_ROUTER_NESTED=1`` in its
 environment.
@@ -28,10 +29,13 @@ from .data import extract_usage, text
 
 NESTED_ENV = "AGENT_ROUTER_NESTED"
 DEFAULT_TIMEOUT = 6.0
-_PROMPT_EXCERPT_CHARS = 4000
+PROMPT_EXCERPT_CHARS = 4000
 _JSON_OBJECT = re.compile(r"\{[^{}]*\}")
 
-_INSTRUCTIONS = """You route coding tasks to the cheapest Claude model that can do them well.
+# Replaces Claude Code's default system prompt in the nested call: that prompt
+# is ~3.4k tokens the classifier never needs. Measured: ~4k -> ~600 input
+# tokens, ~$0.0044 -> ~$0.0007 per call, ~3.3 s -> ~2.3 s.
+SYSTEM_PROMPT = """You route coding tasks to the cheapest Claude model that can do them well.
 Classify the task below into exactly one tier:
 
 low  - mechanical or lookup work: searching or listing files, reading and
@@ -44,7 +48,8 @@ high - deep reasoning: architecture or design decisions, debugging with an
        or migrations, reviews that need judgment.
 
 When unsure between two tiers, pick the higher one.
-Reply with only a JSON object: {"tier": "low" | "mid" | "high", "confidence": <0.0-1.0>}"""
+Output exactly one line: a JSON object {"tier": "low" | "mid" | "high", "confidence": <0.0-1.0>}.
+No code fence, no explanation, nothing before or after it."""
 
 
 @dataclass
@@ -60,10 +65,9 @@ class ClassifierResult:
 
 def build_prompt(subagent_type: Any, description: Any, prompt: Any) -> str:
     body = text(prompt)
-    if len(body) > _PROMPT_EXCERPT_CHARS:
-        body = body[:_PROMPT_EXCERPT_CHARS] + "\n[... truncated]"
+    if len(body) > PROMPT_EXCERPT_CHARS:
+        body = body[:PROMPT_EXCERPT_CHARS] + "\n[... truncated]"
     return (
-        f"{_INSTRUCTIONS}\n\n"
         f"Subagent type: {text(subagent_type) or 'general-purpose'}\n"
         f"Task description: {text(description) or '(none)'}\n"
         f"Task prompt:\n{body or '(none)'}\n"
@@ -84,6 +88,8 @@ def build_command(claude: str, model: str) -> list[str]:
         # Thinking off: a tier label needs no reasoning trace, and thinking
         # doubled latency (6-7 s vs 2-4 s) in measurement.
         json.dumps({"disableAllHooks": True, "alwaysThinkingEnabled": False}),
+        "--system-prompt",
+        SYSTEM_PROMPT,
         "--output-format",
         "json",
     ]

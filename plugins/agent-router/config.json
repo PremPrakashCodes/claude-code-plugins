@@ -7,7 +7,18 @@
   "classifier": {
     "enabled": true,
     "model": "haiku",
-    "timeoutSeconds": 6
+    "timeoutSeconds": 6,
+    "minConfidence": 0.7
+  },
+  "adaptive": {
+    "enabled": true,
+    "minSamples": 5,
+    "maxIssueRate": 0.4,
+    "shortResultChars": 20,
+    "redispatchWindowSeconds": 900
+  },
+  "capture": {
+    "enabled": false
   },
   "log": {
     "maxBytes": 5000000,

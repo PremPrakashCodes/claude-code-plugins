@@ -23,8 +23,28 @@ DEFAULTS: dict[str, Any] = {
     "tiers": {"low": "haiku", "mid": "sonnet", "high": "opus"},
     # AI classifier for subagent dispatches: a minimal headless `claude -p`
     # call. Main-session prompts are never classified. Disabling it turns
-    # routing off. Timeout is set from the measured ~3 s call latency.
-    "classifier": {"enabled": True, "model": "haiku", "timeoutSeconds": 6},
+    # routing off. Timeout is set from the measured ~2-3 s call latency. A
+    # reply below minConfidence (or with no confidence) routes one tier up.
+    "classifier": {
+        "enabled": True,
+        "model": "haiku",
+        "timeoutSeconds": 6,
+        "minConfidence": 0.7,
+    },
+    # Adaptive routing: when rewritten dispatches of one subagent type at one
+    # tier keep showing quality issues (a near-empty result, or the same task
+    # dispatched again soon after), later dispatches of that type at that tier
+    # route one tier up. It only ever escalates.
+    "adaptive": {
+        "enabled": True,
+        "minSamples": 5,
+        "maxIssueRate": 0.4,
+        "shortResultChars": 20,
+        "redispatchWindowSeconds": 900,
+    },
+    # Opt-in: save each dispatch's description and prompt excerpt locally so
+    # real tasks can be exported into an eval set (`agent-router export-captures`).
+    "capture": {"enabled": False},
     # Routing log: rotated by rename when it passes maxBytes; keepSegments old
     # segments are kept (log.1.jsonl ... log.N.jsonl).
     "log": {"maxBytes": 5_000_000, "keepSegments": 3},
@@ -71,6 +91,12 @@ def load(path: Path | None = None) -> dict[str, Any]:
     if not isinstance(user, dict):
         user = {}
     return _deep_merge(DEFAULTS, user)
+
+
+def next_tier(tier: str) -> str:
+    """The next more capable tier (``high`` stays ``high``)."""
+    index = TIERS.index(tier) if tier in TIERS else len(TIERS) - 1
+    return TIERS[min(index + 1, len(TIERS) - 1)]
 
 
 def tier_model(config: dict[str, Any], tier: str) -> str | None:

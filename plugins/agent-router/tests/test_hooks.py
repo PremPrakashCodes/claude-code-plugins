@@ -105,6 +105,64 @@ class TestRouteTask(EnvCase):
         self.assertEqual(record["classifier"]["duration_ms"], 2500)
         self.assertNotIn("Find usages.", json.dumps(record))
 
+    def test_low_confidence_routes_one_tier_up(self):
+        reply, records = hooks.route_task(
+            dispatch_payload(),
+            cfg(),
+            classify=classify_as(ok("low", confidence=0.4)),
+            session_model=session("claude-opus-5"),
+            adaptive_stats=lambda: {},
+        )
+        self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "sonnet")
+        self.assertEqual(records[0]["classifier_tier"], "low")
+        self.assertEqual(records[0]["tier"], "mid")
+        self.assertEqual(records[0]["adjustments"], ["low_confidence"])
+
+    def test_adaptive_stats_escalate_a_struggling_type(self):
+        stats = {"groups": {"x|low": {"outcomes": 6, "issues": 4}}}
+        reply, records = hooks.route_task(
+            dispatch_payload(),
+            cfg(),
+            classify=classify_as("low"),
+            session_model=session("claude-opus-5"),
+            adaptive_stats=lambda: stats,
+        )
+        self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "sonnet")
+        self.assertEqual(records[0]["adjustments"], ["adaptive"])
+
+    def test_decision_carries_task_key_not_description(self):
+        _, records = hooks.route_task(
+            dispatch_payload(description="Find Config Usages"),
+            cfg(),
+            classify=classify_as("low"),
+            session_model=session("claude-opus-5"),
+            adaptive_stats=lambda: {},
+        )
+        _, again = hooks.route_task(
+            dispatch_payload(description="  find config   usages "),
+            cfg(),
+            classify=classify_as("low"),
+            session_model=session("claude-opus-5"),
+            adaptive_stats=lambda: {},
+        )
+        self.assertEqual(records[0]["task_key"], again[0]["task_key"])
+        self.assertNotIn("Find Config Usages", json.dumps(records))
+
+    def test_capture_record_only_when_enabled(self):
+        _, records = hooks.route_task(
+            dispatch_payload(), cfg(), classify=classify_as("low"), adaptive_stats=lambda: {}
+        )
+        self.assertEqual([r["kind"] for r in records], ["decision"])
+        config = cfg()
+        config["capture"]["enabled"] = True
+        _, records = hooks.route_task(
+            dispatch_payload(), config, classify=classify_as("low"), adaptive_stats=lambda: {}
+        )
+        capture = records[-1]
+        self.assertEqual(capture["kind"], "capture")
+        self.assertEqual(capture["description"], "Find config usages")
+        self.assertEqual(capture["routed_tier"], "low")
+
     def test_explicit_model_is_kept_and_not_classified(self):
         fake = classify_as("low")
         reply, records = hooks.route_task(dispatch_payload(model="opus"), cfg(), classify=fake)
@@ -293,6 +351,46 @@ class TestRecordOutcome(EnvCase):
         self.assertEqual(outcome["usage"]["output_tokens"], 130)
         self.assertEqual(outcome["duration_ms"], 4500)
 
+    def test_stop_refreshes_adaptive_stats_when_outcomes_arrive(self):
+        from agent_router import adaptive
+
+        transcript = Path(self.tmp.name) / "agent-a9.jsonl"
+        _write_transcript(transcript, [("claude-haiku-4-5", 10, 1, "2026-09-27T10:00:01.000Z")])
+        log.append(
+            {
+                "kind": "decision",
+                "session_id": "s1",
+                "tool_use_id": "t9",
+                "subagent_type": "Explore",
+                "action": "rewrite",
+                "tier": "low",
+            },
+            cfg(),
+        )
+        run_cli(
+            {
+                "hook_event_name": "PostToolUse",
+                "tool_name": "Agent",
+                "tool_use_id": "t9",
+                "session_id": "s1",
+                "tool_response": {"agentId": "a9"},
+            }
+        )
+        run_cli(
+            {
+                "hook_event_name": "SubagentStop",
+                "session_id": "s1",
+                "agent_id": "a9",
+                "agent_transcript_path": str(transcript),
+                "last_assistant_message": "",
+            }
+        )
+        run_cli({"hook_event_name": "Stop", "session_id": "s1"})
+        outcome = [r for r in log.read_records() if r["kind"] == "outcome"][0]
+        self.assertEqual(outcome["result_chars"], 0)
+        stats = adaptive.load()
+        self.assertEqual(stats["groups"]["Explore|low"], {"outcomes": 1, "issues": 1})
+
     def test_stop_before_transcript_exists_retries_later(self):
         post = {
             "hook_event_name": "PostToolUse",
@@ -350,6 +448,39 @@ class TestCli(EnvCase):
         self.assertEqual(reply["hookSpecificOutput"]["updatedInput"]["model"], "haiku")
         (record,) = list(log.read_records())
         self.assertEqual(record["action"], "rewrite")
+
+    def test_capture_goes_to_capture_file_not_log(self):
+        config_file = self.config_dir / "plugins" / "agent-router" / "config.json"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text(json.dumps({"capture": {"enabled": True}}))
+        real_route_task = hooks.route_task
+        with mock.patch.object(
+            cli.hooks_mod,
+            "route_task",
+            lambda p, c: real_route_task(
+                p,
+                c,
+                classify=classify_as("low"),
+                session_model=session("claude-opus-5"),
+                adaptive_stats=lambda: {},
+            ),
+        ):
+            run_cli(dispatch_payload())
+        self.assertEqual([r["kind"] for r in log.read_records()], ["decision"])
+        captures = list(log.read_records(cli.capture_path()))
+        self.assertEqual(captures[0]["prompt"], "Find usages.")
+        out = self.data_dir / "golden.jsonl"
+        with mock.patch("sys.stdout", io.StringIO()):
+            self.assertEqual(cli.main(["export-captures", "--out", str(out)]), 0)
+        fixture = json.loads(out.read_text().splitlines()[0])
+        self.assertEqual(fixture["expected_tier"], "low")
+        self.assertEqual(fixture["description"], "Find config usages")
+
+    def test_export_without_captures_fails_clearly(self):
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err):
+            self.assertEqual(cli.main(["export-captures"]), 1)
+        self.assertIn("capture.enabled", err.getvalue())
 
     def test_garbage_stdin_is_silent(self):
         code, out = run_cli({}, command="route-task", raw="{{{ not json")

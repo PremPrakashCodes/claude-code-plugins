@@ -161,6 +161,16 @@ class TestClassifier(unittest.TestCase):
         self.assertEqual(kwargs["env"]["AGENT_ROUTER_NESTED"], "1")
         self.assertEqual(kwargs["timeout"], 4)
 
+    def test_classifier_only_system_prompt_replaces_default(self):
+        runner = FakeRunner(cli_output('{"tier": "low"}'))
+        classify(runner)
+        args, kwargs = runner.calls[0]
+        self.assertEqual(args[args.index("--system-prompt") + 1], classifier.SYSTEM_PROMPT)
+        self.assertIn("Output exactly one line", classifier.SYSTEM_PROMPT)
+        # instructions travel as the system prompt, not in the task text
+        self.assertNotIn("You route coding tasks", kwargs["input"])
+        self.assertTrue(kwargs["input"].startswith("Subagent type: Explore"))
+
     def test_task_text_goes_to_stdin_not_argv(self):
         runner = FakeRunner(cli_output('{"tier": "low"}'))
         classify(runner, description="Find usages", prompt="SECRET-PROMPT-BODY")

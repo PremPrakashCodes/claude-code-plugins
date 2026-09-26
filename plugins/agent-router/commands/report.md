@@ -15,6 +15,12 @@ Relay the report, then briefly interpret it:
 - **Routing decisions** by source: `LLM` (the classifier picked the tier),
   `override` (a model the user chose was kept), `fallback` (the classifier
   failed; the dispatch kept its model).
+- **Routed one tier up**: `low_confidence` (the classifier was unsure) and
+  `adaptive` (this subagent type kept showing quality issues at the lower tier).
+- **Quality issues**: `short_result` (the subagent returned almost nothing) and
+  `redispatched` (the same task was sent again soon after). A subagent type with
+  many issues in the breakdown table is a candidate for pinning a stronger model
+  in its agent definition.
 - **Kept after classifying**: `no_upgrade` and `same_model` mean the classifier's
   pick was not cheaper than the model the dispatch would already use.
 - **Net savings** are an estimate: each routed subagent's real token usage priced

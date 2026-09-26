@@ -83,6 +83,35 @@ class TestSummary(unittest.TestCase):
         self.assertAlmostEqual(summary["net_savings_usd"], 7.5 - 1.5 - 0.012)
         self.assertEqual(summary["routed_with_outcome"], 1)
 
+    def test_breakdown_by_subagent_type_with_quality_and_adjustments(self):
+        records = [
+            decision(
+                "t1",
+                tier="low",
+                model="haiku",
+                baseline_model="claude-opus-5",
+                subagent_type="Explore",
+                adjustments=["low_confidence"],
+            ),
+            outcome("t1", "claude-haiku-4-5", 1_000_000, 0),
+            decision(
+                "t2", source="fallback", action="kept", reason="timeout", subagent_type="Plan"
+            ),
+        ]
+        records[1]["result_chars"] = 0
+        summary = report.summarize(records, cfg())
+        explore = summary["by_subagent_type"]["Explore"]
+        self.assertEqual(explore["rewrites"], 1)
+        self.assertEqual(explore["outcomes"], 1)
+        self.assertEqual(explore["quality_issues"], 1)
+        self.assertAlmostEqual(explore["net_savings_usd"], 5.0 - 1.0 - 0.004)
+        self.assertEqual(summary["by_subagent_type"]["Plan"]["fallbacks"], 1)
+        self.assertEqual(summary["adjustments"], {"low_confidence": 1})
+        self.assertEqual(summary["quality_issue_kinds"], {"short_result": 1})
+        text = report.format_summary(summary, cfg())
+        self.assertIn("By subagent type:", text)
+        self.assertIn("Explore", text)
+
     def test_empty_log(self):
         summary = report.summarize([], cfg())
         self.assertEqual(summary["decisions"], 0)

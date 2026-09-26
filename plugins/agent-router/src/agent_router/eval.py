@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import classifier as classifier_mod
+from . import tiers as tiers_mod
 from .config import TIERS
 
 DEFAULT_FLOOR = 0.8
@@ -53,15 +54,35 @@ def load_golden(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
     return fixtures, warnings
 
 
+def golden_line(index: int, capture: dict[str, Any]) -> dict[str, Any]:
+    """A golden-set fixture from a captured dispatch, labeled with the router's pick.
+
+    The label is a starting point for human review, not ground truth.
+    """
+    return {
+        "id": f"captured-{index + 1}",
+        "subagent_type": capture.get("subagent_type") or "general-purpose",
+        "description": capture.get("description") or "",
+        "prompt": capture.get("prompt") or "",
+        "expected_tier": capture.get("routed_tier") or capture.get("classifier_tier") or "mid",
+        "label_source": "router - review before trusting",
+    }
+
+
 def run(
     fixtures: list[dict[str, Any]],
     config: dict[str, Any],
     classify: Callable[..., classifier_mod.ClassifierResult] | None = None,
 ) -> dict[str, Any]:
+    """Score the routed tier (classifier answer plus the confidence adjustment).
+
+    Adaptive escalation is left out: it depends on one user's history, not on
+    the task. ``classifier_accuracy`` reports the raw classifier answer too.
+    """
     classify = classify or classify_fn()
     confusion: dict[str, dict[str, int]] = {tier: {} for tier in TIERS}
     failures = []
-    correct = 0
+    correct = raw_correct = under_routed = 0
     cost = 0.0
 
     def call(item: dict[str, Any]) -> classifier_mod.ClassifierResult:
@@ -75,8 +96,12 @@ def run(
         if isinstance(result.cost_usd, (int, float)):
             cost += result.cost_usd
         expected = item["expected_tier"]
-        got = result.tier if result.ok and result.tier else "failed"
-        if got == "failed":
+        if result.ok and result.tier:
+            got, _ = tiers_mod.confidence_adjusted(result.tier, result.confidence, config)
+            raw_correct += result.tier == expected
+            under_routed += TIERS.index(got) < TIERS.index(expected)
+        else:
+            got = "failed"
             failures.append({"id": item["id"], "reason": result.reason})
         confusion[expected][got] = confusion[expected].get(got, 0) + 1
         if got == expected:
@@ -86,6 +111,8 @@ def run(
         "total": total,
         "correct": correct,
         "accuracy": correct / total if total else 0.0,
+        "classifier_accuracy": raw_correct / total if total else 0.0,
+        "under_routed": under_routed,
         "confusion": confusion,
         "failures": failures,
         "classifier_cost_usd": round(cost, 6),
@@ -96,11 +123,13 @@ def format_result(result: dict[str, Any], floor: float) -> str:
     lines = [
         "agent-router eval",
         "",
-        f"Accuracy: {result['accuracy'] * 100:.1f}%  "
+        f"Accuracy (routed tier): {result['accuracy'] * 100:.1f}%  "
         f"({result['correct']}/{result['total']}; floor {floor * 100:.0f}%)",
-        f"Classifier cost: ${result['classifier_cost_usd']:.4f}",
+        f"Classifier alone:       {result['classifier_accuracy'] * 100:.1f}%",
+        f"Routed too low:         {result['under_routed']} (the risky direction)",
+        f"Classifier cost:        ${result['classifier_cost_usd']:.4f}",
         "",
-        "Expected tier -> classifier answers:",
+        "Expected tier -> routed tier:",
     ]
     for tier in TIERS:
         answers = result["confusion"].get(tier) or {}
