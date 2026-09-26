@@ -17,11 +17,8 @@ from . import data as data_mod
 from . import outcomes as outcomes_mod
 from .config import tier_model
 
-# Cost order of model families, cheapest first.
-_FAMILY_RANK = {"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3, "mythos": 3}
-
 # Claude Code's setting for a default subagent model; a user-chosen default is
-# an explicit choice the router must respect (R6).
+# an explicit choice the router must respect.
 SUBAGENT_MODEL_ENV = "CLAUDE_CODE_SUBAGENT_MODEL"
 
 
@@ -40,7 +37,6 @@ def _decision(event: data_mod.DispatchEvent, **fields: Any) -> dict[str, Any]:
         "subagent_type": event.subagent_type,
         "fingerprint": _fingerprint(event),
         "signals": {
-            "subagent_type": event.subagent_type,
             "description_chars": len(event.description),
             "prompt_chars": len(event.prompt),
         },
@@ -115,8 +111,8 @@ def route_task(
     target_family = data_mod.model_family(target)
     baseline_family = data_mod.model_family(baseline)
     if target_family and baseline_family:
-        target_rank = _FAMILY_RANK.get(target_family, 99)
-        baseline_rank = _FAMILY_RANK.get(baseline_family, 99)
+        target_rank = data_mod.FAMILY_RANK.get(target_family, 99)
+        baseline_rank = data_mod.FAMILY_RANK.get(baseline_family, 99)
         if target_rank > baseline_rank:
             record = _decision(event, action="kept", model=baseline, reason="no_upgrade", **fields)
             return None, [record]

@@ -78,6 +78,15 @@ class TestRotation(unittest.TestCase):
             self.assertGreater(records[0]["i"], 0)
             self.assertEqual([r["i"] for r in records], sorted(r["i"] for r in records))
 
+    def test_live_only_read_skips_rotated_segments(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "log.jsonl"
+            self._fill(path, 40, cfg(maxBytes=500, keepSegments=5))
+            live = list(log.read_records(path, include_rotated=False))
+            everything = list(log.read_records(path))
+            self.assertLess(len(live), len(everything))
+            self.assertEqual(live, everything[-len(live) :])
+
     def test_configured_cap_changes_pruning_point(self):
         with tempfile.TemporaryDirectory() as small, tempfile.TemporaryDirectory() as big:
             self._fill(Path(small) / "log.jsonl", 40, cfg(maxBytes=500, keepSegments=1))

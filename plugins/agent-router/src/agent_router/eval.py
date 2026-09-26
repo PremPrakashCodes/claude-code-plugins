@@ -11,6 +11,7 @@ gate a release.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,6 +19,8 @@ from . import classifier as classifier_mod
 from .config import TIERS
 
 DEFAULT_FLOOR = 0.8
+# Each fixture is an independent `claude -p` call; a few run at once.
+MAX_PARALLEL_CALLS = 4
 DEFAULT_GOLDEN = Path(__file__).resolve().parents[2] / "evals" / "golden.jsonl"
 
 
@@ -60,10 +63,15 @@ def run(
     failures = []
     correct = 0
     cost = 0.0
-    for item in fixtures:
-        result = classify(
+
+    def call(item: dict[str, Any]) -> classifier_mod.ClassifierResult:
+        return classify(
             item.get("subagent_type"), item.get("description"), item.get("prompt"), config
         )
+
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_CALLS) as pool:
+        results = list(pool.map(call, fixtures))  # map keeps fixture order
+    for item, result in zip(fixtures, results):
         if isinstance(result.cost_usd, (int, float)):
             cost += result.cost_usd
         expected = item["expected_tier"]

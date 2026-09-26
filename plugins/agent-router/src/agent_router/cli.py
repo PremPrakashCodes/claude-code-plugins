@@ -48,7 +48,10 @@ def _run_hook(command: str) -> None:
     if command == "route-task":
         reply, records = hooks_mod.route_task(payload, config)
     elif command == "record-outcome":
-        records = hooks_mod.record_outcome(payload, lambda: list(log_mod.read_records()))
+        # Stop runs every turn: stream only the live log, not rotated history.
+        records = hooks_mod.record_outcome(
+            payload, lambda: log_mod.read_records(include_rotated=False)
+        )
     for record in records:
         log_mod.append(record, config)
     if reply is not None:

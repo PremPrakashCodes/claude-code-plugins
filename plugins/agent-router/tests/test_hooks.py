@@ -83,7 +83,6 @@ class EnvCase(unittest.TestCase):
 
 class TestRouteTask(EnvCase):
     def test_low_dispatch_is_rewritten_with_full_input(self):
-        # AE1, AE3
         payload = dispatch_payload(run_in_background=True)
         reply, records = hooks.route_task(
             payload, cfg(), classify=classify_as("low"), session_model=session("claude-opus-5")
@@ -101,7 +100,7 @@ class TestRouteTask(EnvCase):
         self.assertEqual(record["model"], "haiku")
         self.assertEqual(record["baseline_model"], "claude-opus-5")
         self.assertEqual(record["tool_use_id"], "toolu_1")
-        # AE2: classifier cost is on the record
+        # the classifier's own cost is on the record
         self.assertEqual(record["classifier"]["usage"]["input_tokens"], 4000)
         self.assertEqual(record["classifier"]["duration_ms"], 2500)
         self.assertNotIn("Find usages.", json.dumps(record))
@@ -137,7 +136,6 @@ class TestRouteTask(EnvCase):
         self.assertEqual(records[0]["override"], "subagent_model_env")
 
     def test_classifier_failure_falls_back(self):
-        # AE5
         failed = ClassifierResult(ok=False, reason="timeout", duration_ms=6000)
         reply, records = hooks.route_task(dispatch_payload(), cfg(), classify=classify_as(failed))
         self.assertIsNone(reply)
@@ -237,7 +235,7 @@ def _write_transcript(path: Path, agent_msgs):
 
 class TestRecordOutcome(EnvCase):
     def test_full_outcome_flow_joins_decision(self):
-        # R10: PostToolUse link + SubagentStop + Stop -> outcome record
+        # PostToolUse link + SubagentStop + Stop -> outcome record
         transcript = Path(self.tmp.name) / "agent-a1.jsonl"
         _write_transcript(
             transcript,
@@ -367,7 +365,7 @@ class TestHooksJson(unittest.TestCase):
         self.hooks = json.loads((PLUGIN_DIR / "hooks" / "hooks.json").read_text())["hooks"]
 
     def test_no_main_session_prompt_hook(self):
-        # AE4 / R5: main-session prompts are never classified
+        # main-session prompts are never classified
         self.assertNotIn("UserPromptSubmit", self.hooks)
 
     def test_dispatch_and_outcome_hooks_registered(self):

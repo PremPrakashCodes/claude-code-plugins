@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from .config import TIERS
+from .data import extract_usage, text
 
 NESTED_ENV = "AGENT_ROUTER_NESTED"
 DEFAULT_TIMEOUT = 6.0
@@ -57,18 +58,14 @@ class ClassifierResult:
     usage: dict[str, int] = field(default_factory=dict)
 
 
-def _text(value: Any) -> str:
-    return value if isinstance(value, str) else ""
-
-
 def build_prompt(subagent_type: Any, description: Any, prompt: Any) -> str:
-    body = _text(prompt)
+    body = text(prompt)
     if len(body) > _PROMPT_EXCERPT_CHARS:
         body = body[:_PROMPT_EXCERPT_CHARS] + "\n[... truncated]"
     return (
         f"{_INSTRUCTIONS}\n\n"
-        f"Subagent type: {_text(subagent_type) or 'general-purpose'}\n"
-        f"Task description: {_text(description) or '(none)'}\n"
+        f"Subagent type: {text(subagent_type) or 'general-purpose'}\n"
+        f"Task description: {text(description) or '(none)'}\n"
         f"Task prompt:\n{body or '(none)'}\n"
     )
 
@@ -109,23 +106,6 @@ def _result_entry(stdout: str) -> dict[str, Any] | None:
         if isinstance(entry, dict) and entry.get("type") == "result":
             return entry
     return None
-
-
-def _usage(entry: dict[str, Any]) -> dict[str, int]:
-    raw = entry.get("usage")
-    if not isinstance(raw, dict):
-        return {}
-    usage = {}
-    for key in (
-        "input_tokens",
-        "output_tokens",
-        "cache_read_input_tokens",
-        "cache_creation_input_tokens",
-    ):
-        value = raw.get(key)
-        if isinstance(value, int) and not isinstance(value, bool):
-            usage[key] = value
-    return usage
 
 
 def parse_reply(text: str) -> tuple[str, float | None] | None:
@@ -201,12 +181,12 @@ def classify(
         # CLI startup (the CLI's own duration_ms covers only the API call).
         duration_ms=elapsed(),
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
-        usage=_usage(entry),
+        usage=extract_usage(entry.get("usage")),
     )
     if entry.get("is_error"):
         base.reason = "cli_error"
         return base
-    parsed = parse_reply(_text(entry.get("result")))
+    parsed = parse_reply(text(entry.get("result")))
     if parsed is None:
         base.reason = "bad_reply"
         return base

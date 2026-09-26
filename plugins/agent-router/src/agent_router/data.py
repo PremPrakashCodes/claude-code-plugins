@@ -18,7 +18,16 @@ from typing import Any
 DISPATCH_TOOLS = ("Agent", "Task")
 
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
-_FAMILIES = ("haiku", "sonnet", "opus", "fable", "mythos")
+# Known model families and their cost rank, cheapest first.
+FAMILY_RANK = {"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3, "mythos": 3}
+
+# Token counters Claude reports in a message's ``usage`` block.
+USAGE_KEYS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
+)
 
 
 def _get(d: Any, *path: str, default: Any = None) -> Any:
@@ -30,7 +39,8 @@ def _get(d: Any, *path: str, default: Any = None) -> Any:
     return cur if cur is not None else default
 
 
-def _str(value: Any) -> str:
+def text(value: Any) -> str:
+    """``value`` if it is a string, else the empty string."""
     return value if isinstance(value, str) else ""
 
 
@@ -61,19 +71,19 @@ class DispatchEvent:
 
     @property
     def subagent_type(self) -> str:
-        return _str(self.tool_input.get("subagent_type"))
+        return text(self.tool_input.get("subagent_type"))
 
     @property
     def description(self) -> str:
-        return _str(self.tool_input.get("description"))
+        return text(self.tool_input.get("description"))
 
     @property
     def prompt(self) -> str:
-        return _str(self.tool_input.get("prompt"))
+        return text(self.tool_input.get("prompt"))
 
     @property
     def explicit_model(self) -> str | None:
-        model = _str(self.tool_input.get("model")).strip()
+        model = text(self.tool_input.get("model")).strip()
         return model or None
 
 
@@ -81,17 +91,17 @@ def parse_dispatch(payload: dict[str, Any]) -> DispatchEvent:
     d = payload if isinstance(payload, dict) else {}
     tool_input = d.get("tool_input")
     return DispatchEvent(
-        tool_name=_str(d.get("tool_name")),
-        tool_use_id=_str(d.get("tool_use_id")),
-        session_id=_str(d.get("session_id")),
-        prompt_id=_str(d.get("prompt_id")),
-        cwd=_str(d.get("cwd")),
+        tool_name=text(d.get("tool_name")),
+        tool_use_id=text(d.get("tool_use_id")),
+        session_id=text(d.get("session_id")),
+        prompt_id=text(d.get("prompt_id")),
+        cwd=text(d.get("cwd")),
         tool_input=dict(tool_input) if isinstance(tool_input, dict) else {},
     )
 
 
 # ---------------------------------------------------------------------------
-# Agent definitions: a frontmatter `model` is an explicit choice (R6)
+# Agent definitions: a frontmatter `model` is an explicit user choice
 # ---------------------------------------------------------------------------
 
 
@@ -188,7 +198,19 @@ def model_family(model: str | None) -> str | None:
     if not isinstance(model, str):
         return None
     lowered = model.lower()
-    for family in _FAMILIES:
+    for family in FAMILY_RANK:
         if family in lowered:
             return family
     return None
+
+
+def extract_usage(raw: Any) -> dict[str, int]:
+    """The integer token counters from a ``usage`` block; others are dropped."""
+    if not isinstance(raw, dict):
+        return {}
+    usage = {}
+    for key in USAGE_KEYS:
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            usage[key] = value
+    return usage

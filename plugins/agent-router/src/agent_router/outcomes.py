@@ -18,12 +18,7 @@ import time
 from datetime import datetime
 from typing import Any, Iterable
 
-_USAGE_KEYS = (
-    "input_tokens",
-    "output_tokens",
-    "cache_read_input_tokens",
-    "cache_creation_input_tokens",
-)
+from .data import USAGE_KEYS, extract_usage
 
 
 def _parse_ts(value: Any) -> float | None:
@@ -43,7 +38,7 @@ def summarize_transcript(path: str) -> dict[str, Any] | None:
     """
     if not path:
         return None
-    totals = {key: 0 for key in _USAGE_KEYS}
+    totals = {key: 0 for key in USAGE_KEYS}
     models: dict[str, int] = {}
     seen: set[str] = set()
     first_ts = last_ts = None
@@ -70,12 +65,8 @@ def summarize_transcript(path: str) -> dict[str, Any] | None:
                     if message_id in seen:
                         continue
                     seen.add(message_id)
-                usage = message.get("usage")
-                if isinstance(usage, dict):
-                    for key in _USAGE_KEYS:
-                        value = usage.get(key)
-                        if isinstance(value, int) and not isinstance(value, bool):
-                            totals[key] += value
+                for key, value in extract_usage(message.get("usage")).items():
+                    totals[key] += value
                 model = message.get("model")
                 if isinstance(model, str) and model:
                     models[model] = models.get(model, 0) + 1
@@ -146,6 +137,8 @@ def resolve_pending(
         agent_id = record.get("agent_id")
         if not isinstance(agent_id, str):
             continue
+        if session_id and record.get("session_id") != session_id:
+            continue
         if kind == "link":
             links[agent_id] = record
         elif kind == "subagent_stop":
@@ -155,8 +148,6 @@ def resolve_pending(
     outcomes = []
     for agent_id, stop in stops.items():
         if agent_id in done or agent_id not in links:
-            continue
-        if session_id and stop.get("session_id") != session_id:
             continue
         summary = summarize_transcript(stop.get("transcript") or "")
         if summary is None:

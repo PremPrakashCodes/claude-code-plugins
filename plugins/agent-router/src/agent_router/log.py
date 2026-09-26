@@ -117,9 +117,18 @@ def _read_file(path: Path) -> Iterator[dict[str, Any]]:
         return
 
 
-def read_records(path: Path | None = None) -> Iterator[dict[str, Any]]:
-    """Yield every record, oldest segment first, skipping unreadable lines."""
+def read_records(
+    path: Path | None = None, include_rotated: bool = True
+) -> Iterator[dict[str, Any]]:
+    """Yield every record, oldest segment first, skipping unreadable lines.
+
+    ``include_rotated=False`` reads only the live log - enough for per-turn work
+    about the current session, whose records were written moments earlier.
+    """
     target = path or log_path()
+    if not include_rotated:
+        yield from _read_file(target)
+        return
     segments = []
     index = 1
     while _segment(target, index).exists():
