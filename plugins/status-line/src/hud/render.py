@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any, Callable
 
-from . import bars, gitinfo, router
+from . import bars, gitinfo
 from .colors import colorize, visible_len
 from .data import HudData
 from .formatting import format_cost, format_duration, humanize_tokens
@@ -215,17 +215,6 @@ def _seg_session(data, config, theme) -> list[str]:
     return cells
 
 
-def _seg_router(data, config, theme) -> str | None:
-    summary = router.session_summary(data.session_id)
-    if summary is None:
-        return None
-    routed, savings = summary
-    sign = "-" if savings < 0 else ""
-    amount = format_cost(abs(savings))
-    label = config["router"].get("label", "router")
-    return colorize(f"{label}: {routed}↓ {sign}{amount} saved", theme["router"])
-
-
 # Renderers may return a str, a list[str], or None.
 _RENDERERS: dict[str, Callable] = {
     "model": _seg_model,
@@ -235,7 +224,6 @@ _RENDERERS: dict[str, Callable] = {
     "usage": _seg_usage,
     "cost": _seg_cost,
     "session": _seg_session,
-    "router": _seg_router,
 }
 
 

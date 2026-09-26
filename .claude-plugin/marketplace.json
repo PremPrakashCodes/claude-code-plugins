@@ -9,10 +9,6 @@
     {
       "name": "status-line",
       "source": "./plugins/status-line"
-    },
-    {
-      "name": "agent-router",
-      "source": "./plugins/agent-router"
     }
   ]
 }
